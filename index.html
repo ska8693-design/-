@@ -67,7 +67,7 @@
         .card-value.plus { color: var(--success); }
         .card-value.minus { color: var(--danger); }
 
-        .asset-hero-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 25px; }
+        .asset-hero-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 15px; }
         .asset-card { background: #f8fafc; border: 1px solid #cbd5e1; padding: 16px; border-radius: 10px; }
         .asset-title { font-size: 0.8rem; font-weight: bold; color: #475569; margin-bottom: 4px; }
         .asset-value { font-size: 1.3rem; font-weight: 800; color: #0f172a; }
@@ -153,7 +153,6 @@
                 <input type="month" id="currentMonth" onchange="loadMonthData()">
             </div>
             <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 업로드</button>
-            <button class="btn btn-purple" style="background:#7c3aed;" onclick="openSectionManagerModal()">⚙️ 내역 항목(대분류) 관리</button>
             <button class="btn btn-green" id="familyBtnWithBadge" onclick="openFamilyModal()">👥 가족 연동</button>
             <button class="btn btn-green" id="manualSaveBtn">서버 저장</button>
             <button class="btn btn-sub" onclick="exportToCSV()">엑셀 내보내기</button>
@@ -238,6 +237,11 @@
                 <div class="asset-title">순 자산 (총자산 - 남은 대출)</div>
                 <div class="asset-value" id="dispNetWorth">0 원</div>
             </div>
+        </div>
+
+        <!-- 자산 카드 아래 빈 공간에 위치한 내역 항목(대분류) 관리 버튼 -->
+        <div style="margin-bottom: 20px; text-align: left;">
+            <button class="btn btn-purple" style="background:#7c3aed; padding: 8px 16px; font-size: 0.9rem;" onclick="openSectionManagerModal()">⚙️ 내역 항목(대분류) 관리</button>
         </div>
 
         <div class="main-grid">
@@ -952,12 +956,11 @@
         }
     }
 
-    // 대분류(섹션) 정의 관리 시스템 (기본값 설정 및 커스텀 관리)
     function getSectionDefs() {
         if (!allCloudData.sectionDefs) {
             allCloudData.sectionDefs = [
                 { id: 'incomes', name: '당월 수입 내역', type: 'income', includeCalc: true },
-                { id: 'fixedExpenses', name: '고정 지출 내역 (대출/보험 등)', type: 'expense', includeCalc: false },
+                { id: 'fixedExpenses', name: '고정 지출 내역 (대출/보험 등)', type: 'expense', includeCalc: true },
                 { id: 'flexExpenses', name: '변동 고정비 내역 (통신/관리비 등)', type: 'expense', includeCalc: true },
                 { id: 'variableExpenses', name: '생활비 지출 내역', type: 'variable', includeCalc: true },
                 { id: 'assetItems', name: '기초자산 / 누적자산 & 대출 잔액', type: 'asset', includeCalc: true }
@@ -966,7 +969,6 @@
         return allCloudData.sectionDefs;
     }
 
-    // 소항목(카테고리) 관리
     function getCategories(type) {
         if (!allCloudData.categories) allCloudData.categories = {};
         if (!allCloudData.categories[type]) {
@@ -978,7 +980,6 @@
         return allCloudData.categories[type];
     }
 
-    // ⚙️ 대분류(섹션) 관리 모달 열기/닫기
     window.openSectionManagerModal = function() {
         document.getElementById('sectionManagerModal').classList.add('active');
         renderSectionManagerList();
@@ -1070,7 +1071,6 @@
             const select = document.getElementById(selectId);
             if (!select) return;
             let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-            html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 소항목 관리(추가/수정/삭제)...</option>`;
             select.innerHTML = html;
         };
 
@@ -1078,89 +1078,6 @@
         renderOptions('flex', 'flexCategory');
         renderOptions('variable', 'varCategory');
         renderOptions('asset', 'assetType');
-    }
-
-    window.checkCategoryOption = function(targetType, selectElem) {
-        if (selectElem.value === '__MANAGE__') {
-            openCategoryModal(targetType);
-            selectElem.selectedIndex = 0;
-        }
-    }
-
-    function openCategoryModal(targetType) {
-        currentEditingTarget = targetType;
-        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '자산/대출 소항목 관리' };
-        document.getElementById('modalTitle').innerText = titles[targetType] || '항목 관리';
-        document.getElementById('categoryModal').classList.add('active');
-        renderModalCatList();
-    }
-
-    window.closeCategoryModal = function() {
-        document.getElementById('categoryModal').classList.remove('active');
-        renderCategorySelects();
-    }
-
-    function renderModalCatList() {
-        const cats = getCategories(currentEditingTarget);
-        const ul = document.getElementById('modalCatList');
-        ul.innerHTML = '';
-        cats.forEach((cat, idx) => {
-            ul.innerHTML += `
-                <li>
-                    <span style="font-weight:600;">${cat}</span>
-                    <div style="display:flex; gap:4px; align-items:center;">
-                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▲</button>
-                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, 1)" ${idx === cats.length - 1 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▼</button>
-                        <button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editModalCat(${idx})">수정</button>
-                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteModalCat(${idx})">삭제</button>
-                    </div>
-                </li>`;
-        });
-    }
-
-    window.moveCatOrder = function(idx, direction) {
-        const cats = getCategories(currentEditingTarget);
-        const targetIdx = idx + direction;
-        if (targetIdx < 0 || targetIdx >= cats.length) return;
-        const temp = cats[idx];
-        cats[idx] = cats[targetIdx];
-        cats[targetIdx] = temp;
-        saveCloudData();
-        renderModalCatList();
-    }
-
-    window.addModalCategory = function() {
-        const input = document.getElementById('modalNewCatName');
-        const name = input.value.trim();
-        if (!name) return alert('항목명을 입력해주세요.');
-        const cats = getCategories(currentEditingTarget);
-        if (!cats.includes(name)) {
-            cats.push(name);
-            saveCloudData();
-            renderModalCatList();
-            input.value = '';
-        } else {
-            alert('이미 존재하는 항목명입니다.');
-        }
-    }
-
-    window.editModalCat = function(idx) {
-        const cats = getCategories(currentEditingTarget);
-        const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
-        if (newName && newName.trim() !== '') {
-            cats[idx] = newName.trim();
-            saveCloudData();
-            renderModalCatList();
-        }
-    }
-
-    window.deleteModalCat = function(idx) {
-        const cats = getCategories(currentEditingTarget);
-        if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
-            cats.splice(idx, 1);
-            saveCloudData();
-            renderModalCatList();
-        }
     }
 
     window.openAiModal = function() {
@@ -1382,6 +1299,8 @@
                 isDuplicate = curData.fixedExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
             } else if (sectionKey === 'flexExpenses') {
                 isDuplicate = curData.flexExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'variableExpenses') {
+                isDuplicate = curData.variableExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
             } else if (sectionKey === 'assetItems') {
                 isDuplicate = curData.assetItems.some(x => x.name === item.name && x.val === item.val);
             }
@@ -1496,19 +1415,18 @@
             const items = data[sec.id];
 
             let sectionTableHtml = '';
+            let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
 
             if (sec.type === 'income') {
-                let secInc = 0;
                 let rows = '';
                 items.forEach(item => {
-                    secInc += item.amount;
                     if (sec.includeCalc) totalIncome += item.amount;
                     rows += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
-                            <span class="section-title">${sec.name} ${!sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706;">(참고용)</span>' : ''}</span>
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
                             <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
                         </div>
                         <div class="form-row">
@@ -1536,11 +1454,8 @@
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
-                            <span class="section-title">${sec.name} ${!sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706;">(참고용)</span>' : ''}</span>
-                            <div style="display:flex; gap:6px;">
-                                <button class="btn btn-sub" style="background:#7c3aed;" onclick="openCategoryModal('${catKey}')">⚙️ 항목 관리</button>
-                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
-                            </div>
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
+                            <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
                         </div>
                         <div class="form-row">
                             <select id="catSelect_${sec.id}" onchange="checkCategoryOption('${catKey}', this)"></select>
@@ -1570,8 +1485,8 @@
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
-                            <span class="section-title">${sec.name} ${!sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706;">(참고용)</span>' : ''}</span>
-                            <button class="btn btn-sub" style="background:#7c3aed;" onclick="openCategoryModal('variable')">⚙️ 항목 관리</button>
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
+                            <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
                         </div>
                         <div class="form-row">
                             <input type="date" id="varDate_${sec.id}">
@@ -1589,14 +1504,16 @@
             } else if (sec.type === 'asset') {
                 let rows = '';
                 items.forEach(item => {
-                    if (item.type === '대출잔액') totalLoans += item.val;
-                    else totalAssetsReg += item.val;
+                    if (sec.includeCalc) {
+                        if (item.type === '대출잔액') totalLoans += item.val;
+                        else totalAssetsReg += item.val;
+                    }
                     rows += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
-                            <span class="section-title">${sec.name}</span>
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
                             <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
                         </div>
                         <div class="form-row">
@@ -1613,27 +1530,11 @@
                     </div>`;
             }
 
-            // 좌우 분할 배치 (짝수 index는 왼쪽, 홀수 index는 오른쪽)
             if (index % 2 === 0) leftHtml += sectionTableHtml;
             else rightHtml += sectionTableHtml;
         });
 
-        document.getElementById('dynamicSectionsContainer').innerHTML = leftHtml;
-        document.getElementById('dynamicSectionsContainerRight').innerHTML = rightHtml;
-
-        // 드롭다운 셀렉트 렌더링 세팅
-        defs.forEach(sec => {
-            if (sec.type === 'expense') {
-                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
-                renderSelectOptions(catKey, `catSelect_${sec.id}`);
-            } else if (sec.type === 'variable') {
-                renderSelectOptions('variable', `catSelect_${sec.id}`);
-            } else if (sec.type === 'asset') {
-                renderSelectOptions('asset', `assetType_${sec.id}`);
-            }
-        });
-
-        // 생활비 세부 집계 표 렌더링
+        // 당월 생활비 세부 항목별 집계 표는 항상 우측 하단에 고정 표시
         let subTbodyHtml = '';
         let subTotalSum = Object.values(subCatMap).reduce((a, b) => a + b, 0);
         if (Object.keys(subCatMap).length === 0) {
@@ -1644,8 +1545,7 @@
                 subTbodyHtml += `<tr><td><b>${cat}</b></td><td class="amount">${fmt(amt)}</td><td style="text-align:right; color:#2563eb; font-weight:bold;">${subTotalSum > 0 ? ((amt / subTotalSum) * 100).toFixed(1) : 0}%</td></tr>`;
             });
         }
-        // 생활비 집계표는 오른쪽 하단에 고정 추가
-        document.getElementById('dynamicSectionsContainerRight').innerHTML += `
+        rightHtml += `
             <div class="section-box">
                 <div class="section-header"><span class="section-title">당월 생활비 세부 항목별 집계 (참고용)</span></div>
                 <table>
@@ -1653,6 +1553,20 @@
                     <tbody>${subTbodyHtml}</tbody>
                 </table>
             </div>`;
+
+        document.getElementById('dynamicSectionsContainer').innerHTML = leftHtml;
+        document.getElementById('dynamicSectionsContainerRight').innerHTML = rightHtml;
+
+        defs.forEach(sec => {
+            if (sec.type === 'expense') {
+                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
+                renderSelectOptions(catKey, `catSelect_${sec.id}`);
+            } else if (sec.type === 'variable') {
+                renderSelectOptions('variable', `catSelect_${sec.id}`);
+            } else if (sec.type === 'asset') {
+                renderSelectOptions('asset', `assetType_${sec.id}`);
+            }
+        });
 
         const availableMoney = totalIncome - totalFlex - totalTongTotal;
         const totalBalance = carryOver + availableMoney;
@@ -1678,11 +1592,92 @@
         const select = document.getElementById(selectId);
         if (!select) return;
         let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-        html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 항목 관리(추가/수정/삭제)...</option>`;
         select.innerHTML = html;
     }
 
-    // 커스텀 섹션 데이터 추가 함수들
+    window.checkCategoryOption = function(targetType, selectElem) {
+        if (selectElem.value === '__MANAGE__') {
+            openCategoryModal(targetType);
+            selectElem.selectedIndex = 0;
+        }
+    }
+
+    function openCategoryModal(targetType) {
+        currentEditingTarget = targetType;
+        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '자산/대출 소항목 관리' };
+        document.getElementById('modalTitle').innerText = titles[targetType] || '항목 관리';
+        document.getElementById('categoryModal').classList.add('active');
+        renderModalCatList();
+    }
+
+    window.closeCategoryModal = function() {
+        document.getElementById('categoryModal').classList.remove('active');
+        renderCategorySelects();
+    }
+
+    function renderModalCatList() {
+        const cats = getCategories(currentEditingTarget);
+        const ul = document.getElementById('modalCatList');
+        ul.innerHTML = '';
+        cats.forEach((cat, idx) => {
+            ul.innerHTML += `
+                <li>
+                    <span style="font-weight:600;">${cat}</span>
+                    <div style="display:flex; gap:4px; align-items:center;">
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▲</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, 1)" ${idx === cats.length - 1 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▼</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editModalCat(${idx})">수정</button>
+                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteModalCat(${idx})">삭제</button>
+                    </div>
+                </li>`;
+        });
+    }
+
+    window.moveCatOrder = function(idx, direction) {
+        const cats = getCategories(currentEditingTarget);
+        const targetIdx = idx + direction;
+        if (targetIdx < 0 || targetIdx >= cats.length) return;
+        const temp = cats[idx];
+        cats[idx] = cats[targetIdx];
+        cats[targetIdx] = temp;
+        saveCloudData();
+        renderModalCatList();
+    }
+
+    window.addModalCategory = function() {
+        const input = document.getElementById('modalNewCatName');
+        const name = input.value.trim();
+        if (!name) return alert('항목명을 입력해주세요.');
+        const cats = getCategories(currentEditingTarget);
+        if (!cats.includes(name)) {
+            cats.push(name);
+            saveCloudData();
+            renderModalCatList();
+            input.value = '';
+        } else {
+            alert('이미 존재하는 항목명입니다.');
+        }
+    }
+
+    window.editModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
+        if (newName && newName.trim() !== '') {
+            cats[idx] = newName.trim();
+            saveCloudData();
+            renderModalCatList();
+        }
+    }
+
+    window.deleteModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
+            cats.splice(idx, 1);
+            saveCloudData();
+            renderModalCatList();
+        }
+    }
+
     window.addCustomIncome = function(secId) {
         const name = document.getElementById(`incName_${secId}`).value;
         const desc = document.getElementById(`incDesc_${secId}`).value;
@@ -1783,12 +1778,11 @@
     window.editAssetItem = function(id) {
         const data = getStoredData(getMonthKey());
         let item = null;
-        let foundSec = '';
         const defs = getSectionDefs();
         defs.forEach(sec => {
             if (sec.type === 'asset') {
                 const found = (data[sec.id] || []).find(x => x.id === id);
-                if (found) { item = found; foundSec = sec.id; }
+                if (found) { item = found; }
             }
         });
         if (!item) return;
