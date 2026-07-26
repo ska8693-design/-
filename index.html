@@ -516,7 +516,6 @@
             document.getElementById('rememberEmailCheck').checked = true;
         }
 
-        // 로그인 시점의 기본 월을 현재 연도-월로 자동 세팅
         const now = new Date();
         const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
         document.getElementById('currentMonth').value = currentYearMonth;
@@ -704,12 +703,10 @@
             if (docSnap.exists) {
                 allCloudData = docSnap.data();
                 
-                // 데이터 로드 완료 후, 데이터 안에 존재하는 가장 최신 월(YYYY-MM)을 찾아 자동으로 선택해 줄 수도 있습니다.
                 const monthKeys = Object.keys(allCloudData).filter(k => k.match(/^\d{4}-\d{2}$/));
                 if (monthKeys.length > 0) {
                     monthKeys.sort();
                     const latestMonth = monthKeys[monthKeys.length - 1];
-                    // 사용자가 직접 월을 바꾸지 않은 초기 상태라면 최신 기록 월로 이동
                     if (!window.hasUserSelectedMonth) {
                         document.getElementById('currentMonth').value = latestMonth;
                     }
@@ -1215,7 +1212,7 @@
         incTbody.innerHTML = '';
         (data.incomes || []).forEach(item => {
             totalIncome += item.amount;
-            incTbody.innerHTML += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNote('incomes', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn btn-danger" onclick="deleteItem('incomes', ${item.id})">삭제</button></td></tr>`;
+            incTbody.innerHTML += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('incomes', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('incomes', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('incomes', ${item.id})">삭제</button></td></tr>`;
         });
 
         let totalFixed = 0;
@@ -1223,7 +1220,7 @@
         fixTbody.innerHTML = '';
         (data.fixedExpenses || []).forEach(item => {
             totalFixed += item.amount;
-            fixTbody.innerHTML += `<tr><td><span class="badge">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNote('fixedExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn btn-danger" onclick="deleteItem('fixedExpenses', ${item.id})">삭제</button></td></tr>`;
+            fixTbody.innerHTML += `<tr><td><span class="badge">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('fixedExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('fixedExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('fixedExpenses', ${item.id})">삭제</button></td></tr>`;
         });
 
         let totalFlex = 0;
@@ -1231,7 +1228,7 @@
         flexTbody.innerHTML = '';
         (data.flexExpenses || []).forEach(item => {
             totalFlex += item.amount;
-            flexTbody.innerHTML += `<tr><td><span class="badge flex-exp">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNote('flexExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn btn-danger" onclick="deleteItem('flexExpenses', ${item.id})">삭제</button></td></tr>`;
+            flexTbody.innerHTML += `<tr><td><span class="badge flex-exp">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('flexExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('flexExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('flexExpenses', ${item.id})">삭제</button></td></tr>`;
         });
 
         let totalTongTotal = 0;
@@ -1245,7 +1242,7 @@
                 if (!subCatMap[item.cat]) subCatMap[item.cat] = 0;
                 subCatMap[item.cat] += item.amount;
             }
-            varTbody.innerHTML += `<tr><td>${item.date || '-'}</td><td><span class="${isTong ? 'badge main-exp' : 'badge sub-memo'}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNote('variableExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn btn-danger" onclick="deleteItem('variableExpenses', ${item.id})">삭제</button></td></tr>`;
+            varTbody.innerHTML += `<tr><td>${item.date || '-'}</td><td><span class="${isTong ? 'badge main-exp' : 'badge sub-memo'}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('variableExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('variableExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('variableExpenses', ${item.id})">삭제</button></td></tr>`;
         });
 
         const subTbody = document.getElementById('subCategorySummaryTable');
@@ -1265,7 +1262,7 @@
         (data.assetItems || []).forEach(item => {
             if (item.type === '대출잔액') totalLoans += item.val;
             else totalAssetsReg += item.val;
-            assetTbody.innerHTML += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNote('assetItems', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('assetItems', ${item.id})">삭제</button></td></tr>`;
+            assetTbody.innerHTML += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('assetItems', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('assetItems', ${item.id})">삭제</button></td></tr>`;
         });
 
         const availableMoney = totalIncome - totalFlex - totalTongTotal;
@@ -1287,13 +1284,49 @@
         document.getElementById('dispNetWorth').innerText = fmt(totalAssets - totalLoans);
     }
 
-    window.updateItemNote = function(listKey, id, val) {
+    // 비고 입력 시 포커스가 풀리지 않도록 화면을 리렌더링하지 않고 데이터만 담아두고 자동저장 유도
+    window.updateItemNoteSilent = function(listKey, id, val) {
         const data = getStoredData(getMonthKey());
         const item = data[listKey].find(x => x.id === id);
         if (item) {
             item.note = val;
-            saveCloudData();
+            isDataDirty = true;
+            document.getElementById('autoSaveStatus').innerText = '(변경사항 있음)';
         }
+    }
+
+    // 일반 항목 [수정] 기능 추가
+    window.editItem = function(listKey, id) {
+        const data = getStoredData(getMonthKey());
+        const item = data[listKey].find(x => x.id === id);
+        if (!item) return;
+
+        if (listKey === 'incomes') {
+            const newName = prompt('성명을 입력하세요:', item.name);
+            if (newName === null) return;
+            const newDesc = prompt('항목을 입력하세요:', item.desc);
+            if (newDesc === null) return;
+            const newAmtStr = prompt('금액을 입력하세요:', item.amount);
+            if (newAmtStr === null) return;
+            item.name = newName.trim() || item.name;
+            item.desc = newDesc.trim() || item.desc;
+            item.amount = parseAmount(newAmtStr);
+        } else if (listKey === 'fixedExpenses' || listKey === 'flexExpenses') {
+            const newDesc = prompt('내역을 입력하세요:', item.desc);
+            if (newDesc === null) return;
+            const newAmtStr = prompt('금액을 입력하세요:', item.amount);
+            if (newAmtStr === null) return;
+            item.desc = newDesc.trim() || item.desc;
+            item.amount = parseAmount(newAmtStr);
+        } else if (listKey === 'variableExpenses') {
+            const newDesc = prompt('내역을 입력하세요:', item.desc);
+            if (newDesc === null) return;
+            const newAmtStr = prompt('금액을 입력하세요:', item.amount);
+            if (newAmtStr === null) return;
+            item.desc = newDesc.trim() || item.desc;
+            item.amount = parseAmount(newAmtStr);
+        }
+        saveData(data);
     }
 
     window.toggleManualCarry = function() {
