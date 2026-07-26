@@ -266,7 +266,7 @@
                         <button class="btn" onclick="addIncome()">추가</button>
                     </div>
                     <table>
-                        <thead><tr><th>성명</th><th>항목</th><th style="text-align:right;">금액</th><th>비고</th><th></th></tr></thead>
+                        <thead><tr><th>성명</th><th>항목</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
                         <tbody id="incomeTable"></tbody>
                     </table>
                 </div>
@@ -274,17 +274,20 @@
                 <div class="section-box">
                     <div class="section-header">
                         <span class="section-title">고정 지출 내역 (대출/보험 등)</span>
-                        <button class="btn btn-sub" onclick="importSectionData('fixedExpenses')">📥 지난달 불러오기</button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn btn-sub" style="background:#7c3aed;" onclick="openCategoryModal('fixed')">⚙️ 항목 관리</button>
+                            <button class="btn btn-sub" onclick="importSectionData('fixedExpenses')">📥 지난달 불러오기</button>
+                        </div>
                     </div>
                     <div class="form-row">
                         <select id="fixCategory" onchange="checkCategoryOption('fixed', this)"></select>
                         <input type="text" id="fixDesc" placeholder="내역" style="flex:1.2;">
                         <input type="text" id="fixAmount" placeholder="금액" style="flex:0.9;" oninput="formatInputComma(this)">
-                        <input type="text" id="fixNote" placeholder="비고 (예: ~27년5월)" style="flex:1;">
+                        <input type="text" id="fixNote" placeholder="비고" style="flex:1;">
                         <button class="btn" onclick="addFixedExpense()">추가</button>
                     </div>
                     <table>
-                        <thead><tr><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th>비고</th><th></th></tr></thead>
+                        <thead><tr><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
                         <tbody id="fixedExpenseTable"></tbody>
                     </table>
                 </div>
@@ -292,7 +295,10 @@
                 <div class="section-box">
                     <div class="section-header">
                         <span class="section-title">변동 고정비 내역 (통신/관리비 등)</span>
-                        <button class="btn btn-sub" onclick="importSectionData('flexExpenses')">📥 지난달 불러오기</button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn btn-sub" style="background:#7c3aed;" onclick="openCategoryModal('flex')">⚙️ 항목 관리</button>
+                            <button class="btn btn-sub" onclick="importSectionData('flexExpenses')">📥 지난달 불러오기</button>
+                        </div>
                     </div>
                     <div class="form-row">
                         <select id="flexCategory" onchange="checkCategoryOption('flex', this)"></select>
@@ -302,7 +308,7 @@
                         <button class="btn btn-warn" onclick="addFlexExpense()">추가</button>
                     </div>
                     <table>
-                        <thead><tr><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th>비고</th><th></th></tr></thead>
+                        <thead><tr><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
                         <tbody id="flexExpenseTable"></tbody>
                     </table>
                 </div>
@@ -310,7 +316,10 @@
 
             <div>
                 <div class="section-box">
-                    <div class="section-header"><span class="section-title">생활비 지출 내역</span></div>
+                    <div class="section-header">
+                        <span class="section-title">생활비 지출 내역</span>
+                        <button class="btn btn-sub" style="background:#7c3aed;" onclick="openCategoryModal('variable')">⚙️ 항목 관리</button>
+                    </div>
                     <div class="form-row">
                         <input type="date" id="varDate">
                         <select id="varCategory" onchange="checkCategoryOption('variable', this)"></select>
@@ -323,7 +332,7 @@
                         📌 <b>'통 생활비'</b> 항목만 실제 지출로 차감되며 세부 항목은 참고용으로 정리됩니다.
                     </div>
                     <table>
-                        <thead><tr><th>날짜</th><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th>비고</th><th></th></tr></thead>
+                        <thead><tr><th>날짜</th><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
                         <tbody id="variableExpenseTable"></tbody>
                     </table>
                 </div>
@@ -339,7 +348,10 @@
                 <div class="section-box">
                     <div class="section-header">
                         <span class="section-title">기초자산 / 누적자산 & 대출 잔액</span>
-                        <button class="btn btn-sub" onclick="importSectionData('assetItems')">📥 지난달 불러오기</button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="btn btn-sub" style="background:#7c3aed;" onclick="openCategoryModal('asset')">⚙️ 항목 관리</button>
+                            <button class="btn btn-sub" onclick="importSectionData('assetItems')">📥 지난달 불러오기</button>
+                        </div>
                     </div>
                     <div class="form-row">
                         <select id="assetType" onchange="checkCategoryOption('asset', this)"></select>
@@ -349,7 +361,7 @@
                         <button class="btn" onclick="addAssetItem()">등록</button>
                     </div>
                     <table>
-                        <thead><tr><th>구분</th><th>항목명</th><th style="text-align:right;">금액</th><th>비고</th><th></th></tr></thead>
+                        <thead><tr><th>구분</th><th>항목명</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
                         <tbody id="assetTable"></tbody>
                     </table>
                 </div>
@@ -404,7 +416,7 @@
     </div>
 </div>
 
-<!-- 카테고리 관리 모달 -->
+<!-- 항목 관리 모달 -->
 <div class="modal-overlay" id="categoryModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -445,7 +457,7 @@
     </div>
 </div>
 
-<!-- 가족 계정 연동 모달 (양방향 초대, 연동 요청, 자유로운 전환 및 해제 지원) -->
+<!-- 가족 계정 연동 모달 -->
 <div class="modal-overlay" id="familyModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -453,7 +465,6 @@
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeFamilyModal()">&times;</span>
         </div>
         
-        <!-- 현재 연동 상태 및 전환 패널 -->
         <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
             <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
             <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
@@ -464,7 +475,6 @@
             </div>
         </div>
 
-        <!-- 1. 내 가계부로 초대하기 -->
         <div style="margin-bottom: 15px;">
             <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">1️⃣ 내 가계부로 가족 초대하기</label>
             <div style="display:flex; gap:6px;">
@@ -474,7 +484,6 @@
             <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">상대방이 수락하면 내 가계부를 함께 보게 됩니다.</div>
         </div>
 
-        <!-- 2. 상대방 가계부로 연동 요청하기 -->
         <div style="margin-bottom: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
             <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">2️⃣ 상대방 가계부로 연동 요청하기</label>
             <div style="display:flex; gap:6px;">
@@ -484,7 +493,6 @@
             <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">상대방이 수락하면 상대방의 가계부 화면으로 연동됩니다.</div>
         </div>
 
-        <!-- 3. 나에게 온 요청 및 초대 목록 -->
         <div style="margin-bottom: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
             <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">📥 나에게 온 요청 및 초대 목록</label>
             <div id="incomingInvitesList" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:6px; background:#f8fafc; font-size:0.85rem;">
@@ -540,6 +548,7 @@
     let inviteUnsubscribe = null;
     let globalBadgeUnsubscribe = null;
     let hasAlertedInvite = false;
+    let currentEditingTarget = 'fixed';
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -704,7 +713,6 @@
         }
     }
 
-    // 1. 내 가계부로 초대하기
     window.sendFamilyInvitation = function() {
         const targetEmail = document.getElementById('targetFamilyEmail').value.trim().toLowerCase();
         if (!targetEmail) {
@@ -734,7 +742,6 @@
         });
     }
 
-    // 2. 상대방 가계부로 연동 요청하기
     window.sendConnectionRequest = function() {
         const targetEmail = document.getElementById('targetRequestEmail').value.trim().toLowerCase();
         if (!targetEmail) {
@@ -1041,7 +1048,7 @@
             const select = document.getElementById(selectId);
             if (!select) return;
             let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-            html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 항목 추가/수정/삭제...</option>`;
+            html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 항목 관리(추가/수정/삭제/순서)...</option>`;
             select.innerHTML = html;
         };
 
@@ -1060,6 +1067,8 @@
 
     function openCategoryModal(targetType) {
         currentEditingTarget = targetType;
+        const titles = { fixed: '고정 지출 항목 관리', flex: '변동 고정비 항목 관리', variable: '생활비 항목 관리', asset: '자산/대출 항목 관리' };
+        document.getElementById('modalTitle').innerText = titles[targetType] || '항목 관리';
         document.getElementById('categoryModal').classList.add('active');
         renderModalCatList();
     }
@@ -1441,7 +1450,7 @@
         incTbody.innerHTML = '';
         (data.incomes || []).forEach(item => {
             totalIncome += item.amount;
-            incTbody.innerHTML += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('incomes', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('incomes', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('incomes', ${item.id})">삭제</button></td></tr>`;
+            incTbody.innerHTML += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('incomes', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('incomes', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('incomes', ${item.id})">삭제</button></td></tr>`;
         });
 
         let totalFixed = 0;
@@ -1449,7 +1458,7 @@
         fixTbody.innerHTML = '';
         (data.fixedExpenses || []).forEach(item => {
             totalFixed += item.amount;
-            fixTbody.innerHTML += `<tr><td><span class="badge">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('fixedExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('fixedExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('fixedExpenses', ${item.id})">삭제</button></td></tr>`;
+            fixTbody.innerHTML += `<tr><td><span class="badge">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('fixedExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('fixedExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('fixedExpenses', ${item.id})">삭제</button></td></tr>`;
         });
 
         let totalFlex = 0;
@@ -1457,7 +1466,7 @@
         flexTbody.innerHTML = '';
         (data.flexExpenses || []).forEach(item => {
             totalFlex += item.amount;
-            flexTbody.innerHTML += `<tr><td><span class="badge flex-exp">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('flexExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('flexExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('flexExpenses', ${item.id})">삭제</button></td></tr>`;
+            flexTbody.innerHTML += `<tr><td><span class="badge flex-exp">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('flexExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('flexExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('flexExpenses', ${item.id})">삭제</button></td></tr>`;
         });
 
         let totalTongTotal = 0;
@@ -1471,7 +1480,7 @@
                 if (!subCatMap[item.cat]) subCatMap[item.cat] = 0;
                 subCatMap[item.cat] += item.amount;
             }
-            varTbody.innerHTML += `<tr><td>${item.date || '-'}</td><td><span class="${isTong ? 'badge main-exp' : 'badge sub-memo'}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('variableExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('variableExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('variableExpenses', ${item.id})">삭제</button></td></tr>`;
+            varTbody.innerHTML += `<tr><td>${item.date || '-'}</td><td><span class="${isTong ? 'badge main-exp' : 'badge sub-memo'}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('variableExpenses', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('variableExpenses', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('variableExpenses', ${item.id})">삭제</button></td></tr>`;
         });
 
         const subTbody = document.getElementById('subCategorySummaryTable');
@@ -1491,7 +1500,7 @@
         (data.assetItems || []).forEach(item => {
             if (item.type === '대출잔액') totalLoans += item.val;
             else totalAssetsReg += item.val;
-            assetTbody.innerHTML += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('assetItems', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('assetItems', ${item.id})">삭제</button></td></tr>`;
+            assetTbody.innerHTML += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('assetItems', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('assetItems', ${item.id})">삭제</button></td></tr>`;
         });
 
         const availableMoney = totalIncome - totalFlex - totalTongTotal;
