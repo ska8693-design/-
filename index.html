@@ -194,7 +194,7 @@
         <div class="hero-card">
             <div class="hero-title">이번 달 수입 중 사용 가능한 남은 돈 (당월 가용 자금)</div>
             <div class="hero-value" id="dispAvailableMoney">0 원</div>
-            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 통 생활비</div>
+            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 통 생활비 - 기초자산</div>
         </div>
 
         <div class="dashboard-grid">
@@ -333,7 +333,6 @@
                 <option value="expense">지출 성격</option>
                 <option value="variable">생활비 성격</option>
                 <option value="asset">자산 성격</option>
-                <option value="summary">생활비 세부집계 표 성격</option>
             </select>
             <button class="btn btn-purple" onclick="addNewSectionDef()">대분류 추가</button>
         </div>
@@ -964,8 +963,7 @@
                 { id: 'fixedExpenses', name: '고정 지출 내역 (대출/보험 등)', type: 'expense', includeCalc: true },
                 { id: 'flexExpenses', name: '변동 고정비 내역 (통신/관리비 등)', type: 'expense', includeCalc: true },
                 { id: 'variableExpenses', name: '생활비 지출 내역', type: 'variable', includeCalc: true },
-                { id: 'assetItems', name: '기초자산 / 누적자산 & 대출 잔액', type: 'asset', includeCalc: true },
-                { id: 'subCategorySummary', name: '당월 생활비 세부 항목별 집계', type: 'summary', includeCalc: true }
+                { id: 'assetItems', name: '기초자산 / 누적자산 & 대출 잔액', type: 'asset', includeCalc: true }
             ];
         }
         return allCloudData.sectionDefs;
@@ -1404,6 +1402,7 @@
         let totalFixed = 0;
         let totalFlex = 0;
         let totalTongTotal = 0;
+        let totalAssetBase = 0; // 기초자산 총액 (가용 자금 계산 시 제외하기 위함)
         const subCatMap = {};
 
         let totalAssetsReg = 0, totalLoans = 0;
@@ -1413,8 +1412,8 @@
         let rightHtml = '';
 
         defs.forEach((sec, index) => {
-            if (sec.type !== 'summary' && !data[sec.id]) data[sec.id] = [];
-            const items = data[sec.id] || [];
+            if (!data[sec.id]) data[sec.id] = [];
+            const items = data[sec.id];
 
             let sectionTableHtml = '';
             let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
@@ -1507,8 +1506,13 @@
                 let rows = '';
                 items.forEach(item => {
                     if (sec.includeCalc) {
-                        if (item.type === '대출잔액') totalLoans += item.val;
-                        else totalAssetsReg += item.val;
+                        if (item.type === '대출잔액') {
+                            totalLoans += item.val;
+                        } else {
+                            totalAssetsReg += item.val;
+                            // 기초자산 항목(예적금, 주식 등)은 당월 가용 자금 계산에서 제외하기 위해 따로 누적
+                            totalAssetBase += item.val;
+                        }
                     }
                     rows += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
@@ -1528,25 +1532,6 @@
                         <table>
                             <thead><tr><th>구분</th><th>항목명</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
                             <tbody>${rows}</tbody>
-                        </table>
-                    </div>`;
-            } else if (sec.type === 'summary') {
-                let subTbodyHtml = '';
-                let subTotalSum = Object.values(subCatMap).reduce((a, b) => a + b, 0);
-                if (Object.keys(subCatMap).length === 0) {
-                    subTbodyHtml = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">입력된 세부 지출 내역이 없습니다.</td></tr>`;
-                } else {
-                    Object.keys(subCatMap).forEach(cat => {
-                        const amt = subCatMap[cat];
-                        subTbodyHtml += `<tr><td><b>${cat}</b></td><td class="amount">${fmt(amt)}</td><td style="text-align:right; color:#2563eb; font-weight:bold;">${subTotalSum > 0 ? ((amt / subTotalSum) * 100).toFixed(1) : 0}%</td></tr>`;
-                    });
-                }
-                sectionTableHtml = `
-                    <div class="section-box">
-                        <div class="section-header"><span class="section-title">${sec.name} ${calcBadge}</span></div>
-                        <table>
-                            <thead><tr><th>카테고리</th><th style="text-align:right;">사용 금액</th><th style="text-align:right;">비율</th></tr></thead>
-                            <tbody>${subTbodyHtml}</tbody>
                         </table>
                     </div>`;
             }
@@ -1569,7 +1554,8 @@
             }
         });
 
-        const availableMoney = totalIncome - totalFlex - totalTongTotal;
+        // 당월 가용 자금 계산 시 수입에서 변동고정비, 통생활비뿐만 아니라 기초자산으로 묶인 금액(totalAssetBase)도 차감하여 순수 가용 현금만 표시
+        const availableMoney = totalIncome - totalFlex - totalTongTotal - totalAssetBase;
         const totalBalance = carryOver + availableMoney;
         const totalAssets = totalBalance + totalAssetsReg;
 
@@ -1577,7 +1563,7 @@
         availElem.innerText = fmt(availableMoney);
         availElem.className = availableMoney < 0 ? 'hero-value minus' : 'hero-value';
 
-        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 변동고정비(${fmt(totalFlex)}) - 통 생활비(${fmt(totalTongTotal)}) (고정지출은 통장 잔액에 기반영)`;
+        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 변동고정비(${fmt(totalFlex)}) - 통 생활비(${fmt(totalTongTotal)}) - 기초자산(${fmt(totalAssetBase)})`;
         document.getElementById('dispTotalIncome').innerText = fmt(totalIncome);
         document.getElementById('dispFixedExpense').innerText = fmt(totalFixed);
         document.getElementById('dispFlexExpense').innerText = fmt(totalFlex);
@@ -1879,9 +1865,7 @@
                 };
 
                 defs.forEach(sec => {
-                    if (sec.type !== 'summary') {
-                        (data[sec.id] || []).forEach(x => checkAndPush(x));
-                    }
+                    (data[sec.id] || []).forEach(x => checkAndPush(x));
                 });
 
                 if (monthKeywordSum > 0) {
@@ -1944,20 +1928,18 @@
         csvStr += `[${allCloudData.familyTitle || '우리집'} 가계부 - ${curKey} 내역]\n\n`;
         const defs = getSectionDefs();
         defs.forEach((sec, idx) => {
-            if (sec.type !== 'summary') {
-                csvStr += `${idx + 1}. ${sec.name}\n`;
-                if (sec.type === 'income') {
-                    csvStr += `성명,항목,금액,비고\n`;
-                    (data[sec.id] || []).forEach(x => { csvStr += `"${x.name}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
-                } else if (sec.type === 'expense' || sec.type === 'variable') {
-                    csvStr += `분류,내역,금액,비고\n`;
-                    (data[sec.id] || []).forEach(x => { csvStr += `"${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
-                } else if (sec.type === 'asset') {
-                    csvStr += `구분,항목명,금액,비고\n`;
-                    (data[sec.id] || []).forEach(x => { csvStr += `"${x.type}","${x.name}",${x.val},"${x.note || ''}"\n`; });
-                }
-                csvStr += `\n`;
+            csvStr += `${idx + 1}. ${sec.name}\n`;
+            if (sec.type === 'income') {
+                csvStr += `성명,항목,금액,비고\n`;
+                (data[sec.id] || []).forEach(x => { csvStr += `"${x.name}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+            } else if (sec.type === 'expense' || sec.type === 'variable') {
+                csvStr += `분류,내역,금액,비고\n`;
+                (data[sec.id] || []).forEach(x => { csvStr += `"${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+            } else if (sec.type === 'asset') {
+                csvStr += `구분,항목명,금액,비고\n`;
+                (data[sec.id] || []).forEach(x => { csvStr += `"${x.type}","${x.name}",${x.val},"${x.note || ''}"\n`; });
             }
+            csvStr += `\n`;
         });
 
         const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
