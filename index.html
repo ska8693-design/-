@@ -198,36 +198,11 @@
         <div class="hero-card">
             <div class="hero-title">이번 달 수입 중 사용 가능한 남은 돈 (당월 가용 자금)</div>
             <div class="hero-value" id="dispAvailableMoney">0 원</div>
-            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 생활비 지출 - 예적금/주식 등</div>
+            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 총 지출 - 예적금/주식 등</div>
         </div>
 
-        <!-- 상단 대시보드 요약 카드 영역 (고정 HTML 구조로 복원) -->
-        <div class="dashboard-grid">
-            <div class="card">
-                <div class="card-title">이번 달 총 수입</div>
-                <div class="card-value plus" id="dispTotalIncome">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title" id="cardTitle_1">고정 지출</div>
-                <div class="card-value minus" id="dispExpense_1">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title" id="cardTitle_2">변동 고정비</div>
-                <div class="card-value minus" style="color:#d97706;" id="dispExpense_2">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title" id="cardTitle_3">생활비 지출</div>
-                <div class="card-value minus" id="dispExpense_3">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">전월 이월금</div>
-                <div class="card-value" id="dispCarryOver">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">통장 총 잔액</div>
-                <div class="card-value" id="dispTotalBalance">0 원</div>
-            </div>
-        </div>
+        <!-- 상단 대시보드 요약 카드 영역 (대분류에 맞게 100% 동적 생성) -->
+        <div class="dashboard-grid" id="dynamicDashboardCards"></div>
 
         <div class="asset-hero-grid">
             <div class="asset-card">
@@ -1758,26 +1733,36 @@
         });
 
         // ------------------------------------------------------------------
-        // [수정 완료] 상단 대시보드 지출 카드들에 대분류 이름과 합계 금액을 정확히 맵핑
+        // [완벽 동적 처리] 지출/생활비 성격의 대분류 개수만큼 상단 카드를 100% 자동 생성
         // ------------------------------------------------------------------
-        document.getElementById('dispTotalIncome').innerText = fmt(totalIncome);
+        let dashboardCardsHtml = `
+            <div class="card">
+                <div class="card-title">이번 달 총 수입</div>
+                <div class="card-value plus" id="dispTotalIncome">${fmt(totalIncome)}</div>
+            </div>`;
 
-        const expenseSecs = defs.filter(s => s.type === 'expense' || s.type === 'variable');
-        
-        for (let i = 1; i <= 3; i++) {
-            const titleElem = document.getElementById(`cardTitle_${i}`);
-            const valElem = document.getElementById(`dispExpense_${i}`);
-            if (titleElem && valElem) {
-                if (expenseSecs[i - 1]) {
-                    titleElem.innerText = expenseSecs[i - 1].name;
-                    let sSum = sectionSums[expenseSecs[i - 1].id] ? sectionSums[expenseSecs[i - 1].id].amount : 0;
-                    valElem.innerText = fmt(sSum);
-                    titleElem.parentElement.style.display = 'block';
-                } else {
-                    titleElem.parentElement.style.display = 'none'; // 대분류가 3개보다 적을 경우 카드 숨김
-                }
+        defs.forEach(sec => {
+            if (sec.type === 'expense' || sec.type === 'variable') {
+                let sSum = sectionSums[sec.id] ? sectionSums[sec.id].amount : 0;
+                dashboardCardsHtml += `
+                    <div class="card">
+                        <div class="card-title">${sec.name}</div>
+                        <div class="card-value minus">${fmt(sSum)}</div>
+                    </div>`;
             }
-        }
+        });
+
+        dashboardCardsHtml += `
+            <div class="card">
+                <div class="card-title">전월 이월금</div>
+                <div class="card-value" id="dispCarryOver">${fmt(carryOver)}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">통장 총 잔액</div>
+                <div class="card-value" id="dispTotalBalance">${fmt(carryOver + totalIncome - totalExpenseSum)}</div>
+            </div>`;
+
+        document.getElementById('dynamicDashboardCards').innerHTML = dashboardCardsHtml;
 
         const availableMoney = totalIncome - totalAssetBase - totalExpenseSum;
         const totalBalance = carryOver + totalIncome - totalExpenseSum;
@@ -1788,8 +1773,6 @@
         availElem.className = availableMoney < 0 ? 'hero-value minus' : 'hero-value';
 
         document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 총 지출항목 합계(${fmt(totalExpenseSum)}) - 예적금/주식 등(${fmt(totalAssetBase)})`;
-        document.getElementById('dispCarryOver').innerText = fmt(carryOver);
-        document.getElementById('dispTotalBalance').innerText = fmt(totalBalance);
         document.getElementById('dispTotalAssets').innerText = fmt(totalAssets);
         document.getElementById('dispTotalLoans').innerText = fmt(totalLoans);
         document.getElementById('dispNetWorth').innerText = fmt(totalAssets - totalLoans);
