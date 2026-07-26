@@ -150,7 +150,7 @@
             <span id="currentConnectedInfo" style="background: rgba(255,255,255,0.15); padding: 4px 8px; border-radius: 4px; font-weight: 500;">연동 중...</span>
             <span id="autoSaveStatus" style="font-size: 0.75rem; color: #cbd5e1;">(자동저장 대기중)</span>
             <div class="month-selector">
-                <input type="month" id="currentMonth" value="2026-03" onchange="loadMonthData()">
+                <input type="month" id="currentMonth" onchange="loadMonthData()">
             </div>
             <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 업로드</button>
             <button class="btn btn-green" onclick="openFamilyModal()">👥 가족 연동</button>
@@ -515,6 +515,12 @@
             document.getElementById('loginEmail').value = savedEmail;
             document.getElementById('rememberEmailCheck').checked = true;
         }
+
+        // 로그인 시점의 기본 월을 현재 연도-월로 자동 세팅
+        const now = new Date();
+        const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        document.getElementById('currentMonth').value = currentYearMonth;
+
         setupDragAndDrop();
 
         document.getElementById('manualSaveBtn').addEventListener('click', function() {
@@ -697,6 +703,17 @@
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
             if (docSnap.exists) {
                 allCloudData = docSnap.data();
+                
+                // 데이터 로드 완료 후, 데이터 안에 존재하는 가장 최신 월(YYYY-MM)을 찾아 자동으로 선택해 줄 수도 있습니다.
+                const monthKeys = Object.keys(allCloudData).filter(k => k.match(/^\d{4}-\d{2}$/));
+                if (monthKeys.length > 0) {
+                    monthKeys.sort();
+                    const latestMonth = monthKeys[monthKeys.length - 1];
+                    // 사용자가 직접 월을 바꾸지 않은 초기 상태라면 최신 기록 월로 이동
+                    if (!window.hasUserSelectedMonth) {
+                        document.getElementById('currentMonth').value = latestMonth;
+                    }
+                }
             } else {
                 allCloudData = {};
             }
@@ -713,7 +730,6 @@
         }
     }
 
-    // [신규 추가] 현재 선택된 월 데이터 초기화
     window.clearCurrentMonthData = function() {
         const curKey = getMonthKey();
         if (confirm(`정말 [${curKey}] 월의 모든 입력 내역을 초기화하시겠습니까?`)) {
@@ -731,7 +747,6 @@
         }
     }
 
-    // [신규 추가] 전체 가계부 데이터 삭제
     window.clearAllCloudData = function() {
         if (confirm('경고: 전체 모든 월의 가계부 데이터와 설정이 영구적으로 삭제됩니다. 진행하시겠습니까?')) {
             allCloudData = {};
@@ -777,6 +792,11 @@
 
     function getMonthKey() {
         return document.getElementById('currentMonth').value;
+    }
+
+    window.loadMonthData = function() {
+        window.hasUserSelectedMonth = true;
+        render();
     }
 
     window.switchTab = function(tabName) {
@@ -1173,8 +1193,6 @@
         saveCloudData();
         render();
     }
-
-    window.loadMonthData = function() { render(); }
 
     function render() {
         renderCategorySelects();
