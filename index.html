@@ -153,7 +153,7 @@
                 <input type="month" id="currentMonth" onchange="loadMonthData()">
             </div>
             <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 업로드</button>
-            <button class="btn btn-green" onclick="openFamilyModal()">👥 가족 연동</button>
+            <button class="btn btn-green" id="familyBtnWithBadge" onclick="openFamilyModal()">👥 가족 연동</button>
             <button class="btn btn-green" id="manualSaveBtn">서버 저장</button>
             <button class="btn btn-sub" onclick="exportToCSV()">엑셀 내보내기</button>
             <button class="btn btn-warn" onclick="openPasswordModal()">암호변경</button>
@@ -445,7 +445,7 @@
     </div>
 </div>
 
-<!-- 가족 계정 연동 모달 (초대 및 수락 시스템 적용) -->
+<!-- 가족 계정 연동 모달 -->
 <div class="modal-overlay" id="familyModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -521,6 +521,8 @@
     let currentUserEmail = '';
     let isDataDirty = false;
     let inviteUnsubscribe = null;
+    let globalBadgeUnsubscribe = null;
+    let hasAlertedInvite = false; // 중복 알림 방지용
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -632,7 +634,6 @@
         }
     }
 
-    // [신규] 상대방에게 초대장 보내기 (수락 전까지 연동되지 않음)
     window.sendFamilyInvitation = function() {
         const targetEmail = document.getElementById('targetFamilyEmail').value.trim().toLowerCase();
         if (!targetEmail) {
@@ -661,7 +662,38 @@
         });
     }
 
-    // [신규] 나에게 온 초대 목록 실시간 감지
+    // 로그인 시 백그라운드에서 나에게 온 초대장 감지 및 알림 팝업 띄우기
+    function startGlobalInviteListener() {
+        if (!currentUserEmail) return;
+        const myEmailClean = currentUserEmail.toLowerCase();
+
+        if (globalBadgeUnsubscribe) globalBadgeUnsubscribe();
+
+        globalBadgeUnsubscribe = db.collection("family_invites")
+            .where("receiverEmail", "==", myEmailClean)
+            .where("status", "==", "pending")
+            .onSnapshot(snapshot => {
+                const count = snapshot.size;
+                const btn = document.getElementById('familyBtnWithBadge');
+                if (btn) {
+                    if (count > 0) {
+                        btn.innerHTML = `👥 가족 연동 <span style="background:#dc2626; color:white; padding:1px 6px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-left:4px;">${count}</span>`;
+                        
+                        // 새로운 초대장이 도착했을 때 알림창 띄우기 (최초 1회 또는 새 초대 발생 시)
+                        if (!hasAlertedInvite) {
+                            hasAlertedInvite = true;
+                            if (confirm('🔔 새로운 가족 가계부 초대장이 도착했습니다! [가족 연동] 창으로 이동하여 수락하시겠습니까?')) {
+                                openFamilyModal();
+                            }
+                        }
+                    } else {
+                        btn.innerHTML = `👥 가족 연동`;
+                        hasAlertedInvite = false;
+                    }
+                }
+            });
+    }
+
     function listenToIncomingInvites() {
         if (!currentUserEmail) return;
         const myEmailClean = currentUserEmail.toLowerCase();
@@ -695,7 +727,6 @@
             });
     }
 
-    // [신규] 초대 수락 또는 거부 처리
     window.respondInvitation = function(inviteId, senderDocId, isAccepted) {
         if (isAccepted) {
             currentTargetDocId = senderDocId;
@@ -773,9 +804,14 @@
             }
 
             fetchCloudData();
+            startGlobalInviteListener();
         } else {
             document.getElementById('loginScreen').style.display = 'block';
             document.getElementById('mainAppContainer').classList.remove('active');
+            if (globalBadgeUnsubscribe) {
+                globalBadgeUnsubscribe();
+                globalBadgeUnsubscribe = null;
+            }
         }
     });
 
