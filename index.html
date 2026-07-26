@@ -1435,6 +1435,7 @@
         return getStoredDataForMonth(monthKey);
     }
 
+    // 전월의 실제 [통장 총 잔액]을 구하는 함수 (정확한 연동용)
     function calculateTotalBalanceFor(monthKey) {
         const data = getStoredData(monthKey);
         const carry = getCalculatedCarryOver(monthKey);
@@ -1453,15 +1454,19 @@
         return carry + inc - flex - tong;
     }
 
+    // 정확한 'YYYY-MM' 스트링 연산으로 전월 잔액을 다음달 이월금으로 매칭
     function getCalculatedCarryOver(monthKey) {
         const data = getStoredData(monthKey);
         if (data.isManualCarry) return data.manualCarryVal || 0;
 
         const [y, m] = monthKey.split('-').map(Number);
-        if (monthKey === '2026-01' || (y === 2026 && m === 1)) return data.manualCarryVal || 0;
-
-        const prevKey = getMonthKeyOf(y, m - 1);
-        return calculateTotalBalanceFor(prevKey);
+        if (m === 1) {
+            const prevKey = `${y - 1}-12`;
+            return calculateTotalBalanceFor(prevKey);
+        } else {
+            const prevKey = `${y}-${String(m - 1).padStart(2, '0')}`;
+            return calculateTotalBalanceFor(prevKey);
+        }
     }
 
     function getMonthKeyOf(y, m) {
