@@ -1338,36 +1338,35 @@
         return getStoredDataForMonth(monthKey);
     }
 
+    // 통장 총 잔액을 계산하는 헬퍼 함수 (전월 이월금 + 수입 - 변동고정비 - 통생활비)
+    function calculateTotalBalanceFor(monthKey) {
+        const data = getStoredData(monthKey);
+        const carry = getCalculatedCarryOver(monthKey);
+
+        const defs = getSectionDefs();
+        let inc = 0, flex = 0, tong = 0;
+
+        defs.forEach(sec => {
+            if (sec.includeCalc) {
+                if (sec.type === 'income') inc += (data[sec.id] || []).reduce((a, b) => a + (b.amount || 0), 0);
+                else if (sec.type === 'expense') flex += (data[sec.id] || []).reduce((a, b) => a + (b.amount || 0), 0);
+                else if (sec.type === 'variable') tong += (data[sec.id] || []).filter(x => x.cat === '통 생활비').reduce((a, b) => a + (b.amount || 0), 0);
+            }
+        });
+
+        return carry + inc - flex - tong;
+    }
+
+    // 전월의 실제 [통장 총 잔액]을 다음 달 [전월 이월금]으로 정확히 연동
     function getCalculatedCarryOver(monthKey) {
         const data = getStoredData(monthKey);
         if (data.isManualCarry) return data.manualCarryVal || 0;
 
         const [y, m] = monthKey.split('-').map(Number);
+        if (monthKey === '2026-01' || (y === 2026 && m === 1)) return data.manualCarryVal || 0;
+
         const prevKey = getMonthKeyOf(y, m - 1);
-
-        if (monthKey === '2026-01') return data.manualCarryVal || 0;
-
-        const prevData = getStoredData(prevKey);
-        const prevCarryOver = getCalculatedCarryOver(prevKey);
-
-        const defs = getSectionDefs();
-        let prevIncome = 0;
-        let prevFlex = 0;
-        let prevVar = 0;
-
-        defs.forEach(sec => {
-            if (sec.includeCalc) {
-                if (sec.type === 'income') {
-                    prevIncome += (prevData[sec.id] || []).reduce((acc, x) => acc + (x.amount || 0), 0);
-                } else if (sec.type === 'expense') {
-                    prevFlex += (prevData[sec.id] || []).reduce((acc, x) => acc + (x.amount || 0), 0);
-                } else if (sec.type === 'variable') {
-                    prevVar += (prevData[sec.id] || []).filter(x => x.cat === '통 생활비').reduce((acc, x) => acc + (x.amount || 0), 0);
-                }
-            }
-        });
-
-        return prevCarryOver + prevIncome - prevFlex - prevVar;
+        return calculateTotalBalanceFor(prevKey);
     }
 
     function getMonthKeyOf(y, m) {
@@ -1395,7 +1394,7 @@
 
         const carryOver = getCalculatedCarryOver(curKey);
         document.getElementById('carryOverInput').value = (data.isManualCarry ? (data.manualCarryVal || 0) : carryOver).toLocaleString('ko-KR');
-        document.getElementById('carryStatusText').innerText = data.isManualCarry ? '현재: 수동 입력 모드' : '현재: 전월 최종 잔액 자동 연동 중';
+        document.getElementById('carryStatusText').innerText = data.isManualCarry ? '현재: 수동 입력 모드' : '현재: 전월 통장 잔액 자동 연동 중';
         document.getElementById('dispCarryOver').innerText = fmt(carryOver);
 
         let totalIncome = 0;
@@ -1510,7 +1509,6 @@
                             totalLoans += item.val;
                         } else {
                             totalAssetsReg += item.val;
-                            // 기초자산 항목(예적금, 주식 등)은 당월 가용 자금 계산에서 제외하기 위해 따로 누적
                             totalAssetBase += item.val;
                         }
                     }
@@ -1554,9 +1552,8 @@
             }
         });
 
-        // 당월 가용 자금 계산 시 수입에서 변동고정비, 통생활비뿐만 아니라 기초자산으로 묶인 금액(totalAssetBase)도 차감하여 순수 가용 현금만 표시
         const availableMoney = totalIncome - totalFlex - totalTongTotal - totalAssetBase;
-        const totalBalance = carryOver + availableMoney;
+        const totalBalance = carryOver + totalIncome - totalFlex - totalTongTotal;
         const totalAssets = totalBalance + totalAssetsReg;
 
         const availElem = document.getElementById('dispAvailableMoney');
@@ -1752,7 +1749,7 @@
     window.toggleManualCarry = function() {
         const data = getStoredData(getMonthKey());
         data.isManualCarry = document.getElementById('isManualCarry').checked;
-        if (data.isManualCarry) data.manualCarryVal = getCalculatedCarryOver(getMonthKey());
+        if (data.isManualCarry) data.manualCarryVal = calculateTotalBalanceFor(getMonthKey());
         saveData(data);
     }
 
