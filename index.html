@@ -198,35 +198,11 @@
         <div class="hero-card">
             <div class="hero-title">이번 달 수입 중 사용 가능한 남은 돈 (당월 가용 자금)</div>
             <div class="hero-value" id="dispAvailableMoney">0 원</div>
-            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 통 생활비 - 예적금/주식 등</div>
+            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 생활비 지출 - 예적금/주식 등</div>
         </div>
 
-        <div class="dashboard-grid">
-            <div class="card">
-                <div class="card-title">이번 달 총 수입</div>
-                <div class="card-value plus" id="dispTotalIncome">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">고정 지출 (참고용/지출)</div>
-                <div class="card-value minus" id="dispFixedExpense">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">변동 고정비 (참고용/지출)</div>
-                <div class="card-value minus" style="color:#d97706;" id="dispFlexExpense">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">생활비 지출 (실제 지출)</div>
-                <div class="card-value minus" id="dispVariableExpense">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">전월 이월금</div>
-                <div class="card-value" id="dispCarryOver">0 원</div>
-            </div>
-            <div class="card">
-                <div class="card-title">통장 총 잔액</div>
-                <div class="card-value" id="dispTotalBalance">0 원</div>
-            </div>
-        </div>
+        <!-- 상단 대시보드 카드 동적 그리드 -->
+        <div class="dashboard-grid" id="dynamicDashboardCards"></div>
 
         <div class="asset-hero-grid">
             <div class="asset-card">
@@ -306,14 +282,14 @@
         <div class="section-box">
             <div class="section-header"><span class="section-title">연도별 수지 종합 비교</span></div>
             <table>
-                <thead><tr><th>연도</th><th style="text-align:right;">연간 총수입</th><th style="text-align:right;">고정지출</th><th style="text-align:right;">변동고정비</th><th style="text-align:right;">생활비</th><th style="text-align:right;">연간 총지출</th><th style="text-align:right;">연간 순수익</th></tr></thead>
+                <thead><tr><th>연도</th><th style="text-align:right;">연간 총수입</th><th style="text-align:right;">연간 총지출</th><th style="text-align:right;">연간 순수익</th></tr></thead>
                 <tbody id="yearlyCompareTable"></tbody>
             </table>
         </div>
         <div class="section-box">
             <div class="section-header"><span class="section-title">월별 상세 수지 비교</span></div>
             <table>
-                <thead><tr><th>년-월</th><th style="text-align:right;">수입</th><th style="text-align:right;">지출(고정)</th><th style="text-align:right;">지출(변동)</th><th style="text-align:right;">생활비</th><th style="text-align:right;">당월 손익</th><th style="text-align:right;">월말 잔액</th></tr></thead>
+                <thead><tr><th>년-월</th><th style="text-align:right;">총수입</th><th style="text-align:right;">총지출</th><th style="text-align:right;">당월 손익</th><th style="text-align:right;">월말 잔액</th></tr></thead>
                 <tbody id="monthlyCompareTable"></tbody>
             </table>
         </div>
@@ -1406,9 +1382,13 @@
                 isDuplicate = curData.variableExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
             } else if (sectionKey === 'assetItems') {
                 isDuplicate = curData.assetItems.some(x => x.name === item.name && x.val === item.val);
+            } else {
+                if (!curData[sectionKey]) curData[sectionKey] = [];
+                isDuplicate = curData[sectionKey].some(x => (x.desc === item.desc || x.name === item.name) && (x.amount === item.amount || x.val === item.val));
             }
 
             if (!isDuplicate) {
+                if (!curData[sectionKey]) curData[sectionKey] = [];
                 curData[sectionKey].push({ ...item, id: Date.now() + Math.random() });
                 addedCount++;
             }
@@ -1441,7 +1421,6 @@
         return getStoredDataForMonth(monthKey);
     }
 
-    // 전월의 최종 순자산 정확히 계산 (재귀 연동)
     function calculateNetWorthFor(monthKey) {
         const data = getStoredData(monthKey);
         
@@ -1466,9 +1445,7 @@
                 const items = data[sec.id] || [];
                 if (sec.type === 'income') {
                     inc += items.reduce((a, b) => a + (b.amount || 0), 0);
-                } else if (sec.type === 'expense') {
-                    exp += items.reduce((a, b) => a + (b.amount || 0), 0);
-                } else if (sec.type === 'variable') {
+                } else if (sec.type === 'expense' || sec.type === 'variable') {
                     exp += items.reduce((a, b) => a + (b.amount || 0), 0);
                 } else if (sec.type === 'asset') {
                     items.forEach(item => {
@@ -1484,7 +1461,6 @@
         return totalAssets - loans;
     }
 
-    // 전월 이월금 계산
     function getCalculatedCarryOver(monthKey) {
         const data = getStoredData(monthKey);
         if (data.isManualCarry) return data.manualCarryVal || 0;
@@ -1564,12 +1540,13 @@
         let totalAssetBase = 0;
         let totalAssetsReg = 0, totalLoans = 0;
 
-        // 대분류별 대시보드 카드 표시용 동적 집계 변수 초기화
-        let dynamicCardSummaries = {};
-
+        // 대분류 정의 가져오기
         const defs = getSectionDefs();
         let leftHtml = '';
         let rightHtml = '';
+
+        // 각 대분류별 합계를 저장할 객체
+        let sectionSums = {};
 
         defs.forEach((sec, index) => {
             if (!data[sec.id]) data[sec.id] = [];
@@ -1735,9 +1712,9 @@
                     </div>`;
             }
 
-            // 대시보드 카드에 첫 번째, 두 번째, 세 번째 지출 섹션 합계를 동적으로 매칭하기 위해 기록
+            // 지출 성격의 대분류 합계 기록
             if (sec.type === 'expense' || sec.type === 'variable') {
-                dynamicCardSummaries[sec.id] = secSum;
+                sectionSums[sec.id] = { name: sec.name, amount: secSum };
             }
 
             if (index % 2 === 0) leftHtml += sectionTableHtml;
@@ -1758,11 +1735,38 @@
             }
         });
 
-        // 상단 대시보드 요약 카드 동적 바인딩 (순서대로 고정 지출, 변동 고정비, 생활비 지출 섹션의 합계 금액 매칭)
-        const expenseSecs = defs.filter(s => s.type === 'expense' || s.type === 'variable');
-        let fixedExpVal = expenseSecs[0] ? (data[expenseSecs[0].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
-        let flexExpVal = expenseSecs[1] ? (data[expenseSecs[1].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
-        let varExpVal = expenseSecs[2] ? (data[expenseSecs[2].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+        // ------------------------------------------------------------------
+        // [핵심] 상단 대시보드 지출 카드들을 지출 성격 대분류별로 100% 동적 생성
+        // ------------------------------------------------------------------
+        let dashboardCardsHtml = `
+            <div class="card">
+                <div class="card-title">이번 달 총 수입</div>
+                <div class="card-value plus" id="dispTotalIncome">${fmt(totalIncome)}</div>
+            </div>`;
+
+        // 지출/생활비 성격인 대분류들을 순회하며 각각 상단 카드를 동적 생성
+        defs.forEach(sec => {
+            if (sec.type === 'expense' || sec.type === 'variable') {
+                let sSum = sectionSums[sec.id] ? sectionSums[sec.id].amount : 0;
+                dashboardCardsHtml += `
+                    <div class="card">
+                        <div class="card-title">${sec.name}</div>
+                        <div class="card-value minus">${fmt(sSum)}</div>
+                    </div>`;
+            }
+        });
+
+        dashboardCardsHtml += `
+            <div class="card">
+                <div class="card-title">전월 이월금</div>
+                <div class="card-value" id="dispCarryOver">${fmt(carryOver)}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">통장 총 잔액</div>
+                <div class="card-value" id="dispTotalBalance">${fmt(carryOver + totalIncome - totalExpenseSum)}</div>
+            </div>`;
+
+        document.getElementById('dynamicDashboardCards').innerHTML = dashboardCardsHtml;
 
         const availableMoney = totalIncome - totalAssetBase - totalExpenseSum;
         const totalBalance = carryOver + totalIncome - totalExpenseSum;
@@ -1773,11 +1777,6 @@
         availElem.className = availableMoney < 0 ? 'hero-value minus' : 'hero-value';
 
         document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 총 지출항목 합계(${fmt(totalExpenseSum)}) - 예적금/주식 등(${fmt(totalAssetBase)})`;
-        document.getElementById('dispTotalIncome').innerText = fmt(totalIncome);
-        document.getElementById('dispFixedExpense').innerText = fmt(fixedExpVal);
-        document.getElementById('dispFlexExpense').innerText = fmt(flexExpVal);
-        document.getElementById('dispVariableExpense').innerText = fmt(varExpVal);
-        document.getElementById('dispTotalBalance').innerText = fmt(totalBalance);
         document.getElementById('dispTotalAssets').innerText = fmt(totalAssets);
         document.getElementById('dispTotalLoans').innerText = fmt(totalLoans);
         document.getElementById('dispNetWorth').innerText = fmt(totalAssets - totalLoans);
@@ -2035,30 +2034,20 @@
                 }
             });
 
-            const expenseSecs = defs.filter(s => s.type === 'expense' || s.type === 'variable');
-            let fix = expenseSecs[0] ? (data[expenseSecs[0].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
-            let flex = expenseSecs[1] ? (data[expenseSecs[1].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
-            let tong = expenseSecs[2] ? (data[expenseSecs[2].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
-
             const net = inc - expTotal;
             const carry = getCalculatedCarryOver(mKey);
             const balance = carry + net;
 
             const year = mKey.split('-')[0];
-            if (!yearlyMap[year]) yearlyMap[year] = { inc: 0, fix: 0, flex: 0, tong: 0, totalExp: 0 };
+            if (!yearlyMap[year]) yearlyMap[year] = { inc: 0, totalExp: 0 };
             yearlyMap[year].inc += inc;
-            yearlyMap[year].fix += fix;
-            yearlyMap[year].flex += flex;
-            yearlyMap[year].tong += tong;
             yearlyMap[year].totalExp += expTotal;
 
             monthlyBody.innerHTML += `
                 <tr>
                     <td><b>${mKey}</b></td>
                     <td class="amount">${fmt(inc)}</td>
-                    <td class="amount">${fmt(fix)}</td>
-                    <td class="amount" style="color:#d97706;">${fmt(flex)}</td>
-                    <td class="amount">${fmt(tong)}</td>
+                    <td class="amount" style="color:var(--danger);">${fmt(expTotal)}</td>
                     <td class="amount" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${fmt(net)}</td>
                     <td class="amount">${fmt(balance)}</td>
                 </tr>`;
@@ -2123,9 +2112,6 @@
                 <tr>
                     <td><b>${year}년 전체</b></td>
                     <td class="amount">${fmt(yData.inc)}</td>
-                    <td class="amount">${fmt(yData.fix)}</td>
-                    <td class="amount" style="color:#d97706;">${fmt(yData.flex)}</td>
-                    <td class="amount">${fmt(yData.tong)}</td>
                     <td class="amount" style="color:var(--danger);">${fmt(yData.totalExp)}</td>
                     <td class="amount" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${fmt(net)}</td>
                 </tr>`;
