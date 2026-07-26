@@ -198,7 +198,7 @@
         <div class="hero-card">
             <div class="hero-title">이번 달 수입 중 사용 가능한 남은 돈 (당월 가용 자금)</div>
             <div class="hero-value" id="dispAvailableMoney">0 원</div>
-            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 통 생활비 - 기초자산</div>
+            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 통 생활비 - 예적금/주식 등</div>
         </div>
 
         <div class="dashboard-grid">
@@ -336,7 +336,7 @@
                 <option value="income">수입 성격</option>
                 <option value="expense">지출 성격</option>
                 <option value="variable">생활비 성격</option>
-                <option value="asset">자산 성격</option>
+                <option value="asset">자산(예적금/주식 등) 성격</option>
             </select>
             <button class="btn btn-purple" onclick="addNewSectionDef()">대분류 추가</button>
         </div>
@@ -351,7 +351,7 @@
 <div class="modal-overlay" id="categoryModal">
     <div class="modal-box">
         <div class="modal-header">
-            <span id="modalTitle">항목 관리</span>
+            <span id="modalTitle">소항목 관리</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeCategoryModal()">&times;</span>
         </div>
         <div class="form-row">
@@ -967,7 +967,7 @@
                 { id: 'fixedExpenses', name: '고정 지출 내역 (대출/보험 등)', type: 'expense', includeCalc: true },
                 { id: 'flexExpenses', name: '변동 고정비 내역 (통신/관리비 등)', type: 'expense', includeCalc: true },
                 { id: 'variableExpenses', name: '생활비 지출 내역', type: 'variable', includeCalc: true },
-                { id: 'assetItems', name: '기초자산 / 누적자산 & 대출 잔액', type: 'asset', includeCalc: true }
+                { id: 'assetItems', name: '예적금/주식 등 & 대출 잔액', type: 'asset', includeCalc: true }
             ];
         }
         return allCloudData.sectionDefs;
@@ -978,7 +978,7 @@
         if (!allCloudData.categories[type]) {
             if (type === 'fixed') allCloudData.categories[type] = ["대출 상환", "보험료", "계모임/경조사", "구독/할부", "기타 고정"];
             else if (type === 'flex') allCloudData.categories[type] = ["통신비", "아파트 관리비", "가스비/난방비", "전기세/수도세", "출퇴근 주유비", "교통비", "기타 변동고정"];
-            else if (type === 'asset') allCloudData.categories[type] = ["기초자산(예적금)", "기초자산(주식)", "기초자산(기타)", "대출잔액"];
+            else if (type === 'asset') allCloudData.categories[type] = ["예적금", "주식", "기타자산", "대출잔액"];
             else if (type === 'variable') allCloudData.categories[type] = ["통 생활비", "식비/장보기", "커피/디저트", "생필품/쇼핑", "의류/미용", "주식 매도 손실", "기타 변동"];
         }
         return allCloudData.categories[type];
@@ -1102,7 +1102,7 @@
 
     function openCategoryModal(targetType) {
         currentEditingTarget = targetType;
-        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '자산/대출 소항목 관리' };
+        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '예적금/주식 소항목 관리' };
         document.getElementById('modalTitle').innerText = titles[targetType] || '소항목 관리';
         document.getElementById('categoryModal').classList.add('active');
         renderModalCatList();
@@ -1513,7 +1513,6 @@
             let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
 
             if (sec.type === 'income') {
-                // 수입 내역 정렬: 성명 → 항목 가나다순
                 items.sort((a, b) => (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
                 let rows = '';
                 items.forEach(item => {
@@ -1539,7 +1538,6 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'expense') {
-                // 고정/변동고정비 정렬: 분류(대분류순) → 내역 가나다순
                 let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
                 let catOrder = getCategories(catKey);
                 items.sort((a, b) => {
@@ -1577,7 +1575,6 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'variable') {
-                // 생활비 정렬: 날짜순 → 분류순
                 let varOrder = getCategories('variable');
                 items.sort((a, b) => {
                     let dateComp = (a.date || '').localeCompare(b.date || '');
@@ -1621,7 +1618,6 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'asset') {
-                // 자산 정렬: 구분(유형)순 → 항목명순
                 let assetOrder = getCategories('asset');
                 items.sort((a, b) => {
                     let posA = assetOrder.indexOf(a.type);
@@ -1689,7 +1685,7 @@
         availElem.innerText = fmt(availableMoney);
         availElem.className = availableMoney < 0 ? 'hero-value minus' : 'hero-value';
 
-        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 변동고정비(${fmt(totalFlex)}) - 통 생활비(${fmt(totalTongTotal)}) - 기초자산(${fmt(totalAssetBase)})`;
+        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 변동고정비(${fmt(totalFlex)}) - 통 생활비(${fmt(totalTongTotal)}) - 예적금/주식 등(${fmt(totalAssetBase)})`;
         document.getElementById('dispTotalIncome').innerText = fmt(totalIncome);
         document.getElementById('dispFixedExpense').innerText = fmt(totalFixed);
         document.getElementById('dispFlexExpense').innerText = fmt(totalFlex);
@@ -1707,6 +1703,90 @@
         let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
         html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 소항목 관리(추가/수정/삭제)...</option>`;
         select.innerHTML = html;
+    }
+
+    window.checkCategoryOption = function(targetType, selectElem) {
+        if (selectElem.value === '__MANAGE__') {
+            openCategoryModal(targetType);
+            selectElem.selectedIndex = 0;
+        }
+    }
+
+    function openCategoryModal(targetType) {
+        currentEditingTarget = targetType;
+        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '예적금/주식 소항목 관리' };
+        document.getElementById('modalTitle').innerText = titles[targetType] || '소항목 관리';
+        document.getElementById('categoryModal').classList.add('active');
+        renderModalCatList();
+    }
+
+    window.closeCategoryModal = function() {
+        document.getElementById('categoryModal').classList.remove('active');
+        renderCategorySelects();
+        render();
+    }
+
+    function renderModalCatList() {
+        const cats = getCategories(currentEditingTarget);
+        const ul = document.getElementById('modalCatList');
+        ul.innerHTML = '';
+        cats.forEach((cat, idx) => {
+            ul.innerHTML += `
+                <li>
+                    <span style="font-weight:600;">${cat}</span>
+                    <div style="display:flex; gap:4px; align-items:center;">
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▲</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, 1)" ${idx === cats.length - 1 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▼</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editModalCat(${idx})">수정</button>
+                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteModalCat(${idx})">삭제</button>
+                    </div>
+                </li>`;
+        });
+    }
+
+    window.moveCatOrder = function(idx, direction) {
+        const cats = getCategories(currentEditingTarget);
+        const targetIdx = idx + direction;
+        if (targetIdx < 0 || targetIdx >= cats.length) return;
+        const temp = cats[idx];
+        cats[idx] = cats[targetIdx];
+        cats[targetIdx] = temp;
+        saveCloudData();
+        renderModalCatList();
+    }
+
+    window.addModalCategory = function() {
+        const input = document.getElementById('modalNewCatName');
+        const name = input.value.trim();
+        if (!name) return alert('항목명을 입력해주세요.');
+        const cats = getCategories(currentEditingTarget);
+        if (!cats.includes(name)) {
+            cats.push(name);
+            saveCloudData();
+            renderModalCatList();
+            input.value = '';
+        } else {
+            alert('이미 존재하는 항목명입니다.');
+        }
+    }
+
+    window.editModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
+        if (newName && newName.trim() !== '') {
+            cats[idx] = newName.trim();
+            saveCloudData();
+            renderModalCatList();
+        }
+    }
+
+    window.deleteModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
+            cats.splice(idx, 1);
+            saveCloudData();
+            renderModalCatList();
+        }
     }
 
     window.addCustomIncome = function(secId) {
