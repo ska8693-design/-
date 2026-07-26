@@ -1485,6 +1485,7 @@
             prevKey = `${y}-${String(m - 1).padStart(2, '0')}`;
         }
 
+        // 직전 달의 최종 순자산 값을 그대로 리턴
         return calculateNetWorthFor(prevKey);
     }
 
@@ -1494,7 +1495,6 @@
         render();
     }
 
-    // 대분류 내역 정렬 적용 함수
     function applySorting(items, secType, sortMode, catKey) {
         let sorted = [...items];
         if (sortMode === 'category') {
@@ -1529,7 +1529,6 @@
         return sorted;
     }
 
-    // 동적 섹션들을 화면에 렌더링하는 핵심 함수
     function render() {
         renderCategorySelects();
         const curKey = getMonthKey();
