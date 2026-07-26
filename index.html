@@ -201,8 +201,21 @@
             <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 총 지출 - 예적금/주식 등</div>
         </div>
 
-        <!-- 상단 대시보드 요약 카드 영역 (대분류에 맞게 100% 동적 생성) -->
-        <div class="dashboard-grid" id="dynamicDashboardCards"></div>
+        <!-- 상단 대시보드 요약 카드 영역 (고정 HTML 컨테이너 안에 JS가 동적 생성) -->
+        <div class="dashboard-grid" id="dynamicDashboardCards">
+            <div class="card">
+                <div class="card-title">이번 달 총 수입</div>
+                <div class="card-value plus" id="dispTotalIncome">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">전월 이월금</div>
+                <div class="card-value" id="dispCarryOver">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">통장 총 잔액</div>
+                <div class="card-value" id="dispTotalBalance">0 원</div>
+            </div>
+        </div>
 
         <div class="asset-hero-grid">
             <div class="asset-card">
