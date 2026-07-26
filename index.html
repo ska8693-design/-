@@ -333,6 +333,7 @@
                 <option value="expense">지출 성격</option>
                 <option value="variable">생활비 성격</option>
                 <option value="asset">자산 성격</option>
+                <option value="summary">생활비 세부집계 표 성격</option>
             </select>
             <button class="btn btn-purple" onclick="addNewSectionDef()">대분류 추가</button>
         </div>
@@ -963,7 +964,8 @@
                 { id: 'fixedExpenses', name: '고정 지출 내역 (대출/보험 등)', type: 'expense', includeCalc: true },
                 { id: 'flexExpenses', name: '변동 고정비 내역 (통신/관리비 등)', type: 'expense', includeCalc: true },
                 { id: 'variableExpenses', name: '생활비 지출 내역', type: 'variable', includeCalc: true },
-                { id: 'assetItems', name: '기초자산 / 누적자산 & 대출 잔액', type: 'asset', includeCalc: true }
+                { id: 'assetItems', name: '기초자산 / 누적자산 & 대출 잔액', type: 'asset', includeCalc: true },
+                { id: 'subCategorySummary', name: '당월 생활비 세부 항목별 집계', type: 'summary', includeCalc: true }
             ];
         }
         return allCloudData.sectionDefs;
@@ -1411,8 +1413,8 @@
         let rightHtml = '';
 
         defs.forEach((sec, index) => {
-            if (!data[sec.id]) data[sec.id] = [];
-            const items = data[sec.id];
+            if (sec.type !== 'summary' && !data[sec.id]) data[sec.id] = [];
+            const items = data[sec.id] || [];
 
             let sectionTableHtml = '';
             let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
@@ -1528,31 +1530,30 @@
                             <tbody>${rows}</tbody>
                         </table>
                     </div>`;
+            } else if (sec.type === 'summary') {
+                let subTbodyHtml = '';
+                let subTotalSum = Object.values(subCatMap).reduce((a, b) => a + b, 0);
+                if (Object.keys(subCatMap).length === 0) {
+                    subTbodyHtml = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">입력된 세부 지출 내역이 없습니다.</td></tr>`;
+                } else {
+                    Object.keys(subCatMap).forEach(cat => {
+                        const amt = subCatMap[cat];
+                        subTbodyHtml += `<tr><td><b>${cat}</b></td><td class="amount">${fmt(amt)}</td><td style="text-align:right; color:#2563eb; font-weight:bold;">${subTotalSum > 0 ? ((amt / subTotalSum) * 100).toFixed(1) : 0}%</td></tr>`;
+                    });
+                }
+                sectionTableHtml = `
+                    <div class="section-box">
+                        <div class="section-header"><span class="section-title">${sec.name} ${calcBadge}</span></div>
+                        <table>
+                            <thead><tr><th>카테고리</th><th style="text-align:right;">사용 금액</th><th style="text-align:right;">비율</th></tr></thead>
+                            <tbody>${subTbodyHtml}</tbody>
+                        </table>
+                    </div>`;
             }
 
             if (index % 2 === 0) leftHtml += sectionTableHtml;
             else rightHtml += sectionTableHtml;
         });
-
-        // 당월 생활비 세부 항목별 집계 표는 항상 우측 하단에 고정 표시
-        let subTbodyHtml = '';
-        let subTotalSum = Object.values(subCatMap).reduce((a, b) => a + b, 0);
-        if (Object.keys(subCatMap).length === 0) {
-            subTbodyHtml = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">입력된 세부 지출 내역이 없습니다.</td></tr>`;
-        } else {
-            Object.keys(subCatMap).forEach(cat => {
-                const amt = subCatMap[cat];
-                subTbodyHtml += `<tr><td><b>${cat}</b></td><td class="amount">${fmt(amt)}</td><td style="text-align:right; color:#2563eb; font-weight:bold;">${subTotalSum > 0 ? ((amt / subTotalSum) * 100).toFixed(1) : 0}%</td></tr>`;
-            });
-        }
-        rightHtml += `
-            <div class="section-box">
-                <div class="section-header"><span class="section-title">당월 생활비 세부 항목별 집계 (참고용)</span></div>
-                <table>
-                    <thead><tr><th>카테고리</th><th style="text-align:right;">사용 금액</th><th style="text-align:right;">비율</th></tr></thead>
-                    <tbody>${subTbodyHtml}</tbody>
-                </table>
-            </div>`;
 
         document.getElementById('dynamicSectionsContainer').innerHTML = leftHtml;
         document.getElementById('dynamicSectionsContainerRight').innerHTML = rightHtml;
@@ -1878,7 +1879,9 @@
                 };
 
                 defs.forEach(sec => {
-                    (data[sec.id] || []).forEach(x => checkAndPush(x));
+                    if (sec.type !== 'summary') {
+                        (data[sec.id] || []).forEach(x => checkAndPush(x));
+                    }
                 });
 
                 if (monthKeywordSum > 0) {
@@ -1941,18 +1944,20 @@
         csvStr += `[${allCloudData.familyTitle || '우리집'} 가계부 - ${curKey} 내역]\n\n`;
         const defs = getSectionDefs();
         defs.forEach((sec, idx) => {
-            csvStr += `${idx + 1}. ${sec.name}\n`;
-            if (sec.type === 'income') {
-                csvStr += `성명,항목,금액,비고\n`;
-                (data[sec.id] || []).forEach(x => { csvStr += `"${x.name}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
-            } else if (sec.type === 'expense' || sec.type === 'variable') {
-                csvStr += `분류,내역,금액,비고\n`;
-                (data[sec.id] || []).forEach(x => { csvStr += `"${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
-            } else if (sec.type === 'asset') {
-                csvStr += `구분,항목명,금액,비고\n`;
-                (data[sec.id] || []).forEach(x => { csvStr += `"${x.type}","${x.name}",${x.val},"${x.note || ''}"\n`; });
+            if (sec.type !== 'summary') {
+                csvStr += `${idx + 1}. ${sec.name}\n`;
+                if (sec.type === 'income') {
+                    csvStr += `성명,항목,금액,비고\n`;
+                    (data[sec.id] || []).forEach(x => { csvStr += `"${x.name}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+                } else if (sec.type === 'expense' || sec.type === 'variable') {
+                    csvStr += `분류,내역,금액,비고\n`;
+                    (data[sec.id] || []).forEach(x => { csvStr += `"${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+                } else if (sec.type === 'asset') {
+                    csvStr += `구분,항목명,금액,비고\n`;
+                    (data[sec.id] || []).forEach(x => { csvStr += `"${x.type}","${x.name}",${x.val},"${x.note || ''}"\n`; });
+                }
+                csvStr += `\n`;
             }
-            csvStr += `\n`;
         });
 
         const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
