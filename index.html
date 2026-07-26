@@ -76,13 +76,14 @@
         @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
 
         .section-box { background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border); padding: 20px; margin-bottom: 20px; }
-        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; }
-        .section-title { font-size: 1.05rem; font-weight: bold; color: var(--primary); }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid var(--bg-color); padding-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+        .section-title { font-size: 1.05rem; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 8px; }
 
         table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 10px; }
         th, td { padding: 9px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background-color: #f8fafc; color: var(--text-muted); font-weight: 600; }
         td.amount { text-align: right; font-weight: bold; }
+        tr.total-row { background-color: #f8fafc; font-weight: bold; border-top: 2px solid var(--border); }
         
         .form-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
         .form-row input, .form-row select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; flex: 1; min-width: 80px; }
@@ -259,7 +260,7 @@
                         </div>
                         <input type="text" id="carryOverInput" placeholder="이월금 직접 입력" disabled oninput="formatInputComma(this); saveManualCarry();">
                     </div>
-                    <div style="font-size:0.8rem; color:var(--text-muted);" id="carryStatusText">현재: 전월 통장 잔액 자동 연동 중</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted);" id="carryStatusText">현재: 전월 순 자산 자동 연동 중</div>
                 </div>
 
                 <!-- 동적 섹션들이 렌더링되는 메인 영역 -->
@@ -478,6 +479,9 @@
     let globalBadgeUnsubscribe = null;
     let hasAlertedInvite = false;
     let currentEditingTarget = 'fixed';
+    
+    // 섹션별 정렬 상태 저장 객체
+    let sectionSortModes = {};
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -984,12 +988,16 @@
         return allCloudData.categories[type];
     }
 
-    // 항목별 고유 색상(배지 클래스) 자동 부여 함수
     function getBadgeClass(catName, type) {
         const cats = getCategories(type);
         let idx = cats.indexOf(catName);
         if (idx === -1) idx = catName.length;
         return `badge-color-${idx % 8}`;
+    }
+
+    window.changeSortMode = function(secId, mode) {
+        sectionSortModes[secId] = mode;
+        render();
     }
 
     window.openSectionManagerModal = function() {
@@ -1435,43 +1443,48 @@
         return getStoredDataForMonth(monthKey);
     }
 
-    // 전월의 실제 [통장 총 잔액]을 구하는 함수 (정확한 연동용)
-    function calculateTotalBalanceFor(monthKey) {
+    function calculateNetWorthFor(monthKey) {
         const data = getStoredData(monthKey);
         const carry = getCalculatedCarryOver(monthKey);
 
         const defs = getSectionDefs();
         let inc = 0, flex = 0, tong = 0;
+        let regAssets = 0, loans = 0;
 
         defs.forEach(sec => {
             if (sec.includeCalc) {
                 if (sec.type === 'income') inc += (data[sec.id] || []).reduce((a, b) => a + (b.amount || 0), 0);
                 else if (sec.type === 'expense') flex += (data[sec.id] || []).reduce((a, b) => a + (b.amount || 0), 0);
                 else if (sec.type === 'variable') tong += (data[sec.id] || []).filter(x => x.cat === '통 생활비').reduce((a, b) => a + (b.amount || 0), 0);
+                else if (sec.type === 'asset') {
+                    (data[sec.id] || []).forEach(item => {
+                        if (item.type === '대출잔액') loans += (item.val || 0);
+                        else regAssets += (item.val || 0);
+                    });
+                }
             }
         });
 
-        return carry + inc - flex - tong;
+        const totalBalance = carry + inc - flex - tong;
+        const totalAssets = totalBalance + regAssets;
+        return totalAssets - loans;
     }
 
-    // 정확한 'YYYY-MM' 스트링 연산으로 전월 잔액을 다음달 이월금으로 매칭
     function getCalculatedCarryOver(monthKey) {
         const data = getStoredData(monthKey);
         if (data.isManualCarry) return data.manualCarryVal || 0;
 
         const [y, m] = monthKey.split('-').map(Number);
-        if (m === 1) {
-            const prevKey = `${y - 1}-12`;
-            return calculateTotalBalanceFor(prevKey);
-        } else {
-            const prevKey = `${y}-${String(m - 1).padStart(2, '0')}`;
-            return calculateTotalBalanceFor(prevKey);
-        }
-    }
+        if (monthKey === '2026-01' || (y === 2026 && m === 1)) return data.manualCarryVal || 0;
 
-    function getMonthKeyOf(y, m) {
-        const d = new Date(y, m - 1, 1);
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        let prevKey = '';
+        if (m === 1) {
+            prevKey = `${y - 1}-12`;
+        } else {
+            prevKey = `${y}-${String(m - 1).padStart(2, '0')}`;
+        }
+
+        return calculateNetWorthFor(prevKey);
     }
 
     function saveData(data) {
@@ -1480,7 +1493,42 @@
         render();
     }
 
-    // 동적 섹션들을 화면에 렌더링하는 핵심 함수 (분류별/가나다순 정렬 적용)
+    // 대분류 내역 정렬 적용 함수
+    function applySorting(items, secType, sortMode, catKey) {
+        let sorted = [...items];
+        if (sortMode === 'category') {
+            if (secType === 'income') {
+                sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
+            } else if (secType === 'expense' || secType === 'variable') {
+                let catOrder = getCategories(catKey);
+                sorted.sort((a, b) => {
+                    let posA = catOrder.indexOf(a.cat);
+                    let posB = catOrder.indexOf(b.cat);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.desc || '').localeCompare(b.desc || '');
+                });
+            } else if (secType === 'asset') {
+                let assetOrder = getCategories('asset');
+                sorted.sort((a, b) => {
+                    let posA = assetOrder.indexOf(a.type);
+                    let posB = assetOrder.indexOf(b.type);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+            }
+        } else if (sortMode === 'alpha') {
+            sorted.sort((a, b) => (a.desc || a.name || '').localeCompare(b.desc || b.name || ''));
+        } else if (sortMode === 'amount_desc') {
+            sorted.sort((a, b) => (b.amount || b.val || 0) - (a.amount || a.val || 0));
+        } else if (sortMode === 'amount_asc') {
+            sorted.sort((a, b) => (a.amount || a.val || 0) - (b.amount || b.val || 0));
+        } else if (sortMode === 'date' && secType === 'variable') {
+            sorted.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        }
+        return sorted;
+    }
+
+    // 동적 섹션들을 화면에 렌더링하는 핵심 함수
     function render() {
         renderCategorySelects();
         const curKey = getMonthKey();
@@ -1494,7 +1542,7 @@
 
         const carryOver = getCalculatedCarryOver(curKey);
         document.getElementById('carryOverInput').value = (data.isManualCarry ? (data.manualCarryVal || 0) : carryOver).toLocaleString('ko-KR');
-        document.getElementById('carryStatusText').innerText = data.isManualCarry ? '현재: 수동 입력 모드' : '현재: 전월 통장 잔액 자동 연동 중';
+        document.getElementById('carryStatusText').innerText = data.isManualCarry ? '현재: 수동 입력 모드' : '현재: 전월 순 자산 자동 연동 중';
         document.getElementById('dispCarryOver').innerText = fmt(carryOver);
 
         let totalIncome = 0;
@@ -1513,22 +1561,40 @@
         defs.forEach((sec, index) => {
             if (!data[sec.id]) data[sec.id] = [];
             let items = [...data[sec.id]];
+            let sortMode = sectionSortModes[sec.id] || 'category';
 
             let sectionTableHtml = '';
             let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
+            
+            // 정렬 선택 셀렉트박스 HTML
+            let sortSelectHtml = `
+                <select style="padding:2px 6px; font-size:0.75rem; border:1px solid var(--border); border-radius:4px; background:#f8fafc;" onchange="changeSortMode('${sec.id}', this.value)">
+                    <option value="category" ${sortMode==='category'?'selected':''}>정렬: 분류별</option>
+                    <option value="alpha" ${sortMode==='alpha'?'selected':''}>정렬: 가나다순</option>
+                    <option value="amount_desc" ${sortMode==='amount_desc'?'selected':''}>정렬: 금액 높은순</option>
+                    <option value="amount_asc" ${sortMode==='amount_asc'?'selected':''}>정렬: 금액 낮은순</option>
+                    ${sec.type==='variable'?`<option value="date" ${sortMode==='date'?'selected':''}>정렬: 날짜순</option>`:''}
+                </select>`;
 
             if (sec.type === 'income') {
-                items.sort((a, b) => (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
+                items = applySorting(items, 'income', sortMode);
                 let rows = '';
+                let secSum = 0;
                 items.forEach(item => {
                     if (sec.includeCalc) totalIncome += item.amount;
+                    secSum += item.amount;
                     rows += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
+                rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
                             <span class="section-title">${sec.name} ${calcBadge}</span>
-                            <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
                         </div>
                         <div class="form-row">
                             <input type="text" id="incName_${sec.id}" placeholder="성명">
@@ -1544,28 +1610,29 @@
                     </div>`;
             } else if (sec.type === 'expense') {
                 let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
-                let catOrder = getCategories(catKey);
-                items.sort((a, b) => {
-                    let posA = catOrder.indexOf(a.cat);
-                    let posB = catOrder.indexOf(b.cat);
-                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
-                    return (a.desc || '').localeCompare(b.desc || '');
-                });
+                items = applySorting(items, 'expense', sortMode, catKey);
 
                 let rows = '';
+                let secSum = 0;
                 items.forEach(item => {
                     if (sec.includeCalc) {
                         if (sec.id === 'fixedExpenses') totalFixed += item.amount;
                         else totalFlex += item.amount;
                     }
+                    secSum += item.amount;
                     let badgeCls = getBadgeClass(item.cat, catKey);
                     rows += `<tr><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
+                rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
                             <span class="section-title">${sec.name} ${calcBadge}</span>
-                            <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
                         </div>
                         <div class="form-row">
                             <select id="catSelect_${sec.id}" onchange="checkCategoryOption('${catKey}', this)"></select>
@@ -1580,17 +1647,10 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'variable') {
-                let varOrder = getCategories('variable');
-                items.sort((a, b) => {
-                    let dateComp = (a.date || '').localeCompare(b.date || '');
-                    if (dateComp !== 0) return dateComp;
-                    let posA = varOrder.indexOf(a.cat);
-                    let posB = varOrder.indexOf(b.cat);
-                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
-                    return (a.desc || '').localeCompare(b.desc || '');
-                });
+                items = applySorting(items, 'variable', sortMode, 'variable');
 
                 let rows = '';
+                let secSum = 0;
                 items.forEach(item => {
                     const isTong = item.cat === '통 생활비';
                     if (sec.includeCalc) {
@@ -1600,14 +1660,20 @@
                             subCatMap[item.cat] += item.amount;
                         }
                     }
+                    secSum += item.amount;
                     let badgeCls = isTong ? 'badge main-exp' : getBadgeClass(item.cat, 'variable');
                     rows += `<tr><td>${item.date || '-'}</td><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
+                rows += `<tr class="total-row"><td colspan="3" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
                             <span class="section-title">${sec.name} ${calcBadge}</span>
-                            <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
                         </div>
                         <div class="form-row">
                             <input type="date" id="varDate_${sec.id}">
@@ -1623,15 +1689,10 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'asset') {
-                let assetOrder = getCategories('asset');
-                items.sort((a, b) => {
-                    let posA = assetOrder.indexOf(a.type);
-                    let posB = assetOrder.indexOf(b.type);
-                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
-                    return (a.name || '').localeCompare(b.name || '');
-                });
+                items = applySorting(items, 'asset', sortMode, 'asset');
 
                 let rows = '';
+                let secSum = 0;
                 items.forEach(item => {
                     if (sec.includeCalc) {
                         if (item.type === '대출잔액') {
@@ -1641,14 +1702,20 @@
                             totalAssetBase += item.val;
                         }
                     }
+                    secSum += item.val;
                     let badgeCls = item.type === '대출잔액' ? 'badge loan' : getBadgeClass(item.type, 'asset');
                     rows += `<tr><td><span class="badge ${badgeCls}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
+                rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
                             <span class="section-title">${sec.name} ${calcBadge}</span>
-                            <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달 불러오기</button>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
                         </div>
                         <div class="form-row">
                             <select id="assetType_${sec.id}" onchange="checkCategoryOption('asset', this)"></select>
@@ -1881,7 +1948,7 @@
     window.toggleManualCarry = function() {
         const data = getStoredData(getMonthKey());
         data.isManualCarry = document.getElementById('isManualCarry').checked;
-        if (data.isManualCarry) data.manualCarryVal = calculateTotalBalanceFor(getMonthKey());
+        if (data.isManualCarry) data.manualCarryVal = calculateNetWorthFor(getMonthKey());
         saveData(data);
     }
 
