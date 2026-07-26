@@ -198,11 +198,35 @@
         <div class="hero-card">
             <div class="hero-title">이번 달 수입 중 사용 가능한 남은 돈 (당월 가용 자금)</div>
             <div class="hero-value" id="dispAvailableMoney">0 원</div>
-            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 지출/생활비 - 예적금/주식 등</div>
+            <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 변동고정비 - 통 생활비 - 예적금/주식 등</div>
         </div>
 
-        <!-- 동적 대시보드 카드 영역 -->
-        <div class="dashboard-grid" id="dynamicDashboardCards"></div>
+        <div class="dashboard-grid">
+            <div class="card">
+                <div class="card-title">이번 달 총 수입</div>
+                <div class="card-value plus" id="dispTotalIncome">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">고정 지출 (참고용/지출)</div>
+                <div class="card-value minus" id="dispFixedExpense">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">변동 고정비 (참고용/지출)</div>
+                <div class="card-value minus" style="color:#d97706;" id="dispFlexExpense">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">생활비 지출 (실제 지출)</div>
+                <div class="card-value minus" id="dispVariableExpense">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">전월 이월금</div>
+                <div class="card-value" id="dispCarryOver">0 원</div>
+            </div>
+            <div class="card">
+                <div class="card-title">통장 총 잔액</div>
+                <div class="card-value" id="dispTotalBalance">0 원</div>
+            </div>
+        </div>
 
         <div class="asset-hero-grid">
             <div class="asset-card">
@@ -251,11 +275,15 @@
 
     <!-- 탭 2: 통계 -->
     <div id="tab-compare" class="tab-content">
+        <!-- 키워드별 상세 비교 검색 박스 -->
         <div class="section-box" style="background: #eff6ff; border-color: #bfdbfe;">
-            <div class="section-header"><span class="section-title" style="color: #1e40af;">🔍 키워드별 상세 지출 비교 통계</span></div>
+            <div class="section-header"><span class="section-title" style="color: #1e40af;">🔍 키워드별 상세 지출 비교 통계 (예: 통신, 보험, 식비 등)</span></div>
             <div class="form-row">
-                <input type="text" id="searchKeywordInput" placeholder="검색할 키워드 입력 (예: 통신, 식비 등)" style="flex: 3;" oninput="renderCompareData()">
+                <input type="text" id="searchKeywordInput" placeholder="검색할 키워드 입력 (예: 통신, 현대해상, 식비 등)" style="flex: 3;" oninput="renderCompareData()">
                 <button class="btn" onclick="renderCompareData()">🔍 검색 및 합산</button>
+            </div>
+            <div style="font-size: 0.78rem; color: #1e40af;" id="searchKeywordSummary">
+                💡 고정지출, 변동고정비, 생활비 전체 내역 중에서 입력한 키워드가 포함된 항목들을 찾아 월별/연도별 합산 금액을 보여드립니다.
             </div>
         </div>
 
@@ -268,10 +296,25 @@
         </div>
 
         <div class="section-box">
+            <div class="section-header"><span class="section-title">키워드별 연도별 종합 비교</span></div>
+            <table>
+                <thead><tr><th>연도</th><th style="text-align:right;">연간 총 합산 지출액</th></tr></thead>
+                <tbody id="keywordYearlyTable"></tbody>
+            </table>
+        </div>
+
+        <div class="section-box">
             <div class="section-header"><span class="section-title">연도별 수지 종합 비교</span></div>
             <table>
-                <thead><tr><th>연도</th><th style="text-align:right;">총수입</th><th style="text-align:right;">총지출</th><th style="text-align:right;">순수익</th></tr></thead>
+                <thead><tr><th>연도</th><th style="text-align:right;">연간 총수입</th><th style="text-align:right;">고정지출</th><th style="text-align:right;">변동고정비</th><th style="text-align:right;">생활비</th><th style="text-align:right;">연간 총지출</th><th style="text-align:right;">연간 순수익</th></tr></thead>
                 <tbody id="yearlyCompareTable"></tbody>
+            </table>
+        </div>
+        <div class="section-box">
+            <div class="section-header"><span class="section-title">월별 상세 수지 비교</span></div>
+            <table>
+                <thead><tr><th>년-월</th><th style="text-align:right;">수입</th><th style="text-align:right;">지출(고정)</th><th style="text-align:right;">지출(변동)</th><th style="text-align:right;">생활비</th><th style="text-align:right;">당월 손익</th><th style="text-align:right;">월말 잔액</th></tr></thead>
+                <tbody id="monthlyCompareTable"></tbody>
             </table>
         </div>
     </div>
@@ -279,17 +322,17 @@
 
 <!-- 내역 항목(대분류) 관리 모달 -->
 <div class="modal-overlay" id="sectionManagerModal">
-    <div class="modal-box" style="max-width: 650px;">
+    <div class="modal-box" style="max-width: 600px;">
         <div class="modal-header">
             <span>⚙️ 내역 항목(대분류) 관리 및 계산 설정</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeSectionManagerModal()">&times;</span>
         </div>
         <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:12px;">
-            대분류를 추가하고 성격(수입, 지출, 생활비, 자산)과 <b>계산 포함 여부(체크 해제 시 참고용으로만 표시)</b>를 설정하세요.
+            가계부의 대분류 섹션을 추가, 수정, 삭제, 순서 변경(상하)하고, 해당 항목이 전체 수입/지출 계산에 포함될지 아니면 <b>'단순 참고용(미포함)'</b>일지 설정할 수 있습니다.
         </div>
         <div class="form-row">
-            <input type="text" id="newSectionTitleInput" placeholder="새 대분류 이름 입력" style="flex:2;">
-            <select id="newSectionTypeInput" style="flex:1.2;">
+            <input type="text" id="newSectionTitleInput" placeholder="새 대분류 이름 입력 (예: 저축, 투자 등)" style="flex:2;">
+            <select id="newSectionTypeInput" style="flex:1;">
                 <option value="income">수입 성격</option>
                 <option value="expense">지출 성격</option>
                 <option value="variable">생활비 성격</option>
@@ -297,7 +340,7 @@
             </select>
             <button class="btn btn-purple" onclick="addNewSectionDef()">대분류 추가</button>
         </div>
-        <ul class="cat-item-list" id="sectionManagerList" style="max-height: 300px;"></ul>
+        <ul class="cat-item-list" id="sectionManagerList" style="max-height: 280px;"></ul>
         <div style="text-align:right;">
             <button class="btn btn-purple" onclick="closeSectionManagerModal()">완료</button>
         </div>
@@ -329,13 +372,19 @@
             <span>📁 엑셀 파일 업로드</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeAiModal()">&times;</span>
         </div>
+        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
+            엑셀 파일(`.xlsx`)을 업로드하여 수입, 고정지출, 변동고정비, 생활비 내역을 자동으로 불러옵니다.
+        </div>
         <div class="drop-zone" id="dropZone" onclick="document.getElementById('excelFileInput').click()">
             <svg width="40" height="40" fill="none" stroke="#2563eb" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             <p style="font-weight: bold; color: var(--primary); margin-top: 6px;">클릭하거나 엑셀 파일을 여기에 놓으세요</p>
+            <p>지원 형식: .xlsx, .xls</p>
             <input type="file" id="excelFileInput" accept=".xlsx, .xls" style="display:none" onchange="handleFileSelect(event)">
         </div>
         <div style="font-size: 0.8rem; color: var(--accent); margin-bottom: 12px; font-weight: 500;" id="selectedFileName"></div>
-        <div style="text-align:right;"><button class="btn btn-danger" onclick="closeAiModal()">닫기</button></div>
+        <div style="text-align:right;">
+            <button class="btn btn-danger" onclick="closeAiModal()">닫기</button>
+        </div>
     </div>
 </div>
 
@@ -346,6 +395,7 @@
             <span>👥 가족 가계부 연동 및 관리</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeFamilyModal()">&times;</span>
         </div>
+        
         <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
             <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
             <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
@@ -355,6 +405,7 @@
                 <button class="btn btn-danger" id="unlinkBtn" style="padding:6px; display:none;" onclick="unlinkFamilyAccount()">연동 해제</button>
             </div>
         </div>
+
         <div style="margin-bottom: 15px;">
             <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">1️⃣ 내 가계부로 가족 초대하기</label>
             <div style="display:flex; gap:6px;">
@@ -362,6 +413,7 @@
                 <button class="btn btn-green" onclick="sendFamilyInvitation()">초대장 보내기</button>
             </div>
         </div>
+
         <div style="margin-bottom: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
             <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">2️⃣ 상대방 가계부로 연동 요청하기</label>
             <div style="display:flex; gap:6px;">
@@ -369,13 +421,17 @@
                 <button class="btn btn-purple" onclick="sendConnectionRequest()">연동 요청하기</button>
             </div>
         </div>
+
         <div style="margin-bottom: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
             <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">📥 나에게 온 요청 및 초대 목록</label>
             <div id="incomingInvitesList" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:6px; background:#f8fafc; font-size:0.85rem;">
                 <div style="color:var(--text-muted); text-align:center; padding:10px;">대기 중인 요청이 없습니다.</div>
             </div>
         </div>
-        <div style="text-align:right; margin-top: 12px;"><button class="btn btn-danger" onclick="closeFamilyModal()">닫기</button></div>
+
+        <div style="text-align:right; margin-top: 12px;">
+            <button class="btn btn-danger" onclick="closeFamilyModal()">닫기</button>
+        </div>
     </div>
 </div>
 
@@ -1340,12 +1396,19 @@
         let addedCount = 0;
         prevItems.forEach(item => {
             let isDuplicate = false;
-            if (curData[sectionKey]) {
-                isDuplicate = curData[sectionKey].some(x => (x.desc === item.desc || x.name === item.name) && (x.amount === item.amount || x.val === item.val));
+            if (sectionKey === 'incomes') {
+                isDuplicate = curData.incomes.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'fixedExpenses') {
+                isDuplicate = curData.fixedExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'flexExpenses') {
+                isDuplicate = curData.flexExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'variableExpenses') {
+                isDuplicate = curData.variableExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'assetItems') {
+                isDuplicate = curData.assetItems.some(x => x.name === item.name && x.val === item.val);
             }
 
             if (!isDuplicate) {
-                if (!curData[sectionKey]) curData[sectionKey] = [];
                 curData[sectionKey].push({ ...item, id: Date.now() + Math.random() });
                 addedCount++;
             }
@@ -1378,13 +1441,12 @@
         return getStoredDataForMonth(monthKey);
     }
 
-    // 대분류 설정(sectionDefs)을 기반으로 전월 순자산을 동적으로 정확히 계산
+    // 전월의 최종 순자산 정확히 계산 (재귀 연동)
     function calculateNetWorthFor(monthKey) {
         const data = getStoredData(monthKey);
-        const defs = getSectionDefs();
         
-        let carry = 0;
         const [y, m] = monthKey.split('-').map(Number);
+        let carry = 0;
         if (data.isManualCarry) {
             carry = data.manualCarryVal || 0;
         } else if (monthKey === '2026-01' || (y === 2026 && m === 1)) {
@@ -1396,18 +1458,18 @@
             }
         }
 
-        let totalInc = 0;
-        let totalExp = 0;
-        let regAssets = 0;
-        let loans = 0;
+        const defs = getSectionDefs();
+        let inc = 0, exp = 0, regAssets = 0, loans = 0;
 
         defs.forEach(sec => {
             if (sec.includeCalc) {
                 const items = data[sec.id] || [];
                 if (sec.type === 'income') {
-                    totalInc += items.reduce((a, b) => a + (b.amount || 0), 0);
-                } else if (sec.type === 'expense' || sec.type === 'variable') {
-                    totalExp += items.reduce((a, b) => a + (b.amount || 0), 0);
+                    inc += items.reduce((a, b) => a + (b.amount || 0), 0);
+                } else if (sec.type === 'expense') {
+                    exp += items.reduce((a, b) => a + (b.amount || 0), 0);
+                } else if (sec.type === 'variable') {
+                    exp += items.reduce((a, b) => a + (b.amount || 0), 0);
                 } else if (sec.type === 'asset') {
                     items.forEach(item => {
                         if (item.type === '대출잔액') loans += (item.val || 0);
@@ -1417,11 +1479,12 @@
             }
         });
 
-        const totalBalance = carry + totalInc - totalExp;
+        const totalBalance = carry + inc - exp;
         const totalAssets = totalBalance + regAssets;
-        return totalAssets - loans; // 순 자산 = 총자산 - 대출
+        return totalAssets - loans;
     }
 
+    // 전월 이월금 계산
     function getCalculatedCarryOver(monthKey) {
         const data = getStoredData(monthKey);
         if (data.isManualCarry) return data.manualCarryVal || 0;
@@ -1429,9 +1492,14 @@
         const [y, m] = monthKey.split('-').map(Number);
         if (monthKey === '2026-01' || (y === 2026 && m === 1)) return data.manualCarryVal || 0;
 
-        let prevKey = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
-        if (!allCloudData[prevKey]) return 0;
+        let prevKey = '';
+        if (m === 1) {
+            prevKey = `${y - 1}-12`;
+        } else {
+            prevKey = `${y}-${String(m - 1).padStart(2, '0')}`;
+        }
 
+        if (!allCloudData[prevKey]) return 0;
         return calculateNetWorthFor(prevKey);
     }
 
@@ -1475,7 +1543,6 @@
         return sorted;
     }
 
-    // 동적 섹션들을 화면에 렌더링하고 대시보드 카드를 동적으로 구성하는 핵심 함수
     function render() {
         renderCategorySelects();
         const curKey = getMonthKey();
@@ -1494,11 +1561,13 @@
 
         let totalIncome = 0;
         let totalExpenseSum = 0;
-        let totalAssetBase = 0; // 가용자금 계산 시 제외할 자산 성격 금액
+        let totalAssetBase = 0;
         let totalAssetsReg = 0, totalLoans = 0;
 
+        // 대분류별 대시보드 카드 표시용 동적 집계 변수 초기화
+        let dynamicCardSummaries = {};
+
         const defs = getSectionDefs();
-        let dashboardCardsHtml = '';
         let leftHtml = '';
         let rightHtml = '';
 
@@ -1506,36 +1575,6 @@
             if (!data[sec.id]) data[sec.id] = [];
             let items = [...data[sec.id]];
             let sortMode = sectionSortModes[sec.id] || 'category';
-
-            let secSum = items.reduce((acc, x) => acc + (x.amount || x.val || 0), 0);
-
-            // 대분류 성격 및 계산 포함 여부에 따른 집계 처리
-            if (sec.includeCalc) {
-                if (sec.type === 'income') {
-                    totalIncome += secSum;
-                } else if (sec.type === 'expense' || sec.type === 'variable') {
-                    totalExpenseSum += secSum;
-                } else if (sec.type === 'asset') {
-                    items.forEach(item => {
-                        if (item.type === '대출잔액') {
-                            totalLoans += (item.val || 0);
-                        } else {
-                            totalAssetsReg += (item.val || 0);
-                            totalAssetBase += (item.val || 0); // 가용 자금 산출 시 제외
-                        }
-                    });
-                }
-            }
-
-            // 대시보드 상단 요약 카드 동적 생성 (참고용이든 계산포함이든 현재 생성된 대분류별 합계를 카드 형태로 표시)
-            let cardColorStyle = sec.type === 'income' ? 'color:var(--success);' : (sec.type === 'expense' || sec.type === 'variable' ? 'color:var(--danger);' : 'color:var(--primary);');
-            if (!sec.includeCalc) cardColorStyle = 'color:var(--text-muted);';
-            
-            dashboardCardsHtml += `
-                <div class="card">
-                    <div class="card-title">${sec.name} ${!sec.includeCalc ? '(참고용)' : ''}</div>
-                    <div class="card-value" style="${cardColorStyle}">${fmt(secSum)}</div>
-                </div>`;
 
             let sectionTableHtml = '';
             let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
@@ -1549,10 +1588,14 @@
                     ${sec.type==='variable'?`<option value="date" ${sortMode==='date'?'selected':''}>정렬: 날짜순</option>`:''}
                 </select>`;
 
+            let secSum = 0;
+
             if (sec.type === 'income') {
                 items = applySorting(items, 'income', sortMode);
                 let rows = '';
                 items.forEach(item => {
+                    if (sec.includeCalc) totalIncome += item.amount;
+                    secSum += item.amount;
                     rows += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
                 rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
@@ -1579,11 +1622,15 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'expense') {
-                let catKey = sec.id.includes('fixed') ? 'fixed' : 'flex';
+                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
                 items = applySorting(items, 'expense', sortMode, catKey);
 
                 let rows = '';
                 items.forEach(item => {
+                    if (sec.includeCalc) {
+                        totalExpenseSum += item.amount;
+                    }
+                    secSum += item.amount;
                     let badgeCls = getBadgeClass(item.cat, catKey);
                     rows += `<tr><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
@@ -1615,9 +1662,12 @@
 
                 let rows = '';
                 items.forEach(item => {
-                    const isTong = item.cat === '통 생활비';
-                    let badgeCls = isTong ? 'badge main-exp' : getBadgeClass(item.cat, 'variable');
-                    rows += `<tr><td>${item.date || '-'}</td><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                    if (sec.includeCalc) {
+                        totalExpenseSum += item.amount;
+                    }
+                    secSum += item.amount;
+                    let badgeCls = getBadgeClass(item.cat, 'variable');
+                    rows += `<tr><td>${item.date || '-'}</td><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
                 rows += `<tr class="total-row"><td colspan="3" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
 
@@ -1648,6 +1698,15 @@
 
                 let rows = '';
                 items.forEach(item => {
+                    if (sec.includeCalc) {
+                        if (item.type === '대출잔액') {
+                            loans += item.val;
+                        } else {
+                            totalAssetsReg += item.val;
+                            totalAssetBase += item.val;
+                        }
+                    }
+                    secSum += item.val;
                     let badgeCls = item.type === '대출잔액' ? 'badge loan' : getBadgeClass(item.type, 'asset');
                     rows += `<tr><td><span class="badge ${badgeCls}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
@@ -1676,17 +1735,21 @@
                     </div>`;
             }
 
+            // 대시보드 카드에 첫 번째, 두 번째, 세 번째 지출 섹션 합계를 동적으로 매칭하기 위해 기록
+            if (sec.type === 'expense' || sec.type === 'variable') {
+                dynamicCardSummaries[sec.id] = secSum;
+            }
+
             if (index % 2 === 0) leftHtml += sectionTableHtml;
             else rightHtml += sectionTableHtml;
         });
 
-        document.getElementById('dynamicDashboardCards').innerHTML = dashboardCardsHtml;
         document.getElementById('dynamicSectionsContainer').innerHTML = leftHtml;
         document.getElementById('dynamicSectionsContainerRight').innerHTML = rightHtml;
 
         defs.forEach(sec => {
             if (sec.type === 'expense') {
-                let catKey = sec.id.includes('fixed') ? 'fixed' : 'flex';
+                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
                 renderSelectOptions(catKey, `catSelect_${sec.id}`);
             } else if (sec.type === 'variable') {
                 renderSelectOptions('variable', `catSelect_${sec.id}`);
@@ -1695,7 +1758,13 @@
             }
         });
 
-        const availableMoney = totalIncome - totalExpenseSum - totalAssetBase;
+        // 상단 대시보드 요약 카드 동적 바인딩 (순서대로 고정 지출, 변동 고정비, 생활비 지출 섹션의 합계 금액 매칭)
+        const expenseSecs = defs.filter(s => s.type === 'expense' || s.type === 'variable');
+        let fixedExpVal = expenseSecs[0] ? (data[expenseSecs[0].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+        let flexExpVal = expenseSecs[1] ? (data[expenseSecs[1].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+        let varExpVal = expenseSecs[2] ? (data[expenseSecs[2].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+
+        const availableMoney = totalIncome - totalAssetBase - totalExpenseSum;
         const totalBalance = carryOver + totalIncome - totalExpenseSum;
         const totalAssets = totalBalance + totalAssetsReg;
 
@@ -1703,7 +1772,11 @@
         availElem.innerText = fmt(availableMoney);
         availElem.className = availableMoney < 0 ? 'hero-value minus' : 'hero-value';
 
-        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 지출/생활비 합계(${fmt(totalExpenseSum)}) - 자산/예적금(${fmt(totalAssetBase)})`;
+        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 총 지출항목 합계(${fmt(totalExpenseSum)}) - 예적금/주식 등(${fmt(totalAssetBase)})`;
+        document.getElementById('dispTotalIncome').innerText = fmt(totalIncome);
+        document.getElementById('dispFixedExpense').innerText = fmt(fixedExpVal);
+        document.getElementById('dispFlexExpense').innerText = fmt(flexExpVal);
+        document.getElementById('dispVariableExpense').innerText = fmt(varExpVal);
         document.getElementById('dispTotalBalance').innerText = fmt(totalBalance);
         document.getElementById('dispTotalAssets').innerText = fmt(totalAssets);
         document.getElementById('dispTotalLoans').innerText = fmt(totalLoans);
@@ -1938,45 +2011,122 @@
         const yearlyBody = document.getElementById('yearlyCompareTable');
         yearlyBody.innerHTML = '';
 
+        const keywordMonthlyBody = document.getElementById('keywordMonthlyTable');
+        keywordMonthlyBody.innerHTML = '';
+        const keywordYearlyBody = document.getElementById('keywordYearlyTable');
+        keywordYearlyBody.innerHTML = '';
+
         const searchKeyword = (document.getElementById('searchKeywordInput').value || '').trim().toLowerCase();
+
         const yearlyMap = {};
+        const keywordYearlyMap = {};
+        let totalKeywordSum = 0;
 
         keys.forEach(mKey => {
             const data = getStoredData(mKey);
             const defs = getSectionDefs();
-            let inc = 0, exp = 0;
+            let inc = 0, expTotal = 0;
 
             defs.forEach(sec => {
                 if (sec.includeCalc) {
                     const items = data[sec.id] || [];
                     if (sec.type === 'income') inc += items.reduce((a, b) => a + (b.amount || 0), 0);
-                    else if (sec.type === 'expense' || sec.type === 'variable') exp += items.reduce((a, b) => a + (b.amount || 0), 0);
+                    else if (sec.type === 'expense' || sec.type === 'variable') expTotal += items.reduce((a, b) => a + (b.amount || 0), 0);
                 }
             });
 
-            const net = inc - exp;
+            const expenseSecs = defs.filter(s => s.type === 'expense' || s.type === 'variable');
+            let fix = expenseSecs[0] ? (data[expenseSecs[0].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+            let flex = expenseSecs[1] ? (data[expenseSecs[1].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+            let tong = expenseSecs[2] ? (data[expenseSecs[2].id] || []).reduce((a, b) => a + (b.amount || 0), 0) : 0;
+
+            const net = inc - expTotal;
+            const carry = getCalculatedCarryOver(mKey);
+            const balance = carry + net;
+
             const year = mKey.split('-')[0];
-            if (!yearlyMap[year]) yearlyMap[year] = { inc: 0, exp: 0 };
+            if (!yearlyMap[year]) yearlyMap[year] = { inc: 0, fix: 0, flex: 0, tong: 0, totalExp: 0 };
             yearlyMap[year].inc += inc;
-            yearlyMap[year].exp += exp;
+            yearlyMap[year].fix += fix;
+            yearlyMap[year].flex += flex;
+            yearlyMap[year].tong += tong;
+            yearlyMap[year].totalExp += expTotal;
 
             monthlyBody.innerHTML += `
                 <tr>
                     <td><b>${mKey}</b></td>
                     <td class="amount">${fmt(inc)}</td>
-                    <td class="amount" style="color:var(--danger);">${fmt(exp)}</td>
+                    <td class="amount">${fmt(fix)}</td>
+                    <td class="amount" style="color:#d97706;">${fmt(flex)}</td>
+                    <td class="amount">${fmt(tong)}</td>
                     <td class="amount" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${fmt(net)}</td>
+                    <td class="amount">${fmt(balance)}</td>
+                </tr>`;
+
+            if (searchKeyword !== '') {
+                let monthKeywordSum = 0;
+                let matchedItemsDesc = [];
+
+                const checkAndPush = (item) => {
+                    const descStr = (item.desc || '').toLowerCase();
+                    const noteStr = (item.note || '').toLowerCase();
+                    const catStr = (item.cat || item.name || '').toLowerCase();
+                    if (descStr.includes(searchKeyword) || noteStr.includes(searchKeyword) || catStr.includes(searchKeyword)) {
+                        monthKeywordSum += (item.amount || item.val || 0);
+                        matchedItemsDesc.push(`${item.desc || item.name} (${fmt(item.amount || item.val)})`);
+                    }
+                };
+
+                defs.forEach(sec => {
+                    (data[sec.id] || []).forEach(x => checkAndPush(x));
+                });
+
+                if (monthKeywordSum > 0) {
+                    if (!keywordYearlyMap[year]) keywordYearlyMap[year] = 0;
+                    keywordYearlyMap[year] += monthKeywordSum;
+                    totalKeywordSum += monthKeywordSum;
+
+                    keywordMonthlyBody.innerHTML += `
+                        <tr>
+                            <td><b>${mKey}</b></td>
+                            <td class="amount" style="color:#2563eb;">${fmt(monthKeywordSum)}</td>
+                            <td style="font-size:0.8rem; color:#475569;">${matchedItemsDesc.join(', ')}</td>
+                        </tr>`;
+                }
+            }
+        });
+
+        if (searchKeyword !== '' && keywordMonthlyBody.innerHTML === '') {
+            keywordMonthlyBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">검색된 키워드('${searchKeyword}')와 일치하는 지출 내역이 없습니다.</td></tr>`;
+        } else if (searchKeyword === '') {
+            keywordMonthlyBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#94a3b8;">상단 검색창에 키워드(예: 통신, 보험, 식비 등)를 입력해주세요.</td></tr>`;
+        }
+
+        Object.keys(keywordYearlyMap).sort().forEach(year => {
+            keywordYearlyBody.innerHTML += `
+                <tr>
+                    <td><b>${year}년 전체</b></td>
+                    <td class="amount" style="color:#2563eb;">${fmt(keywordYearlyMap[year])}</td>
                 </tr>`;
         });
+        if (searchKeyword !== '' && keywordYearlyBody.innerHTML === '') {
+            keywordYearlyBody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#94a3b8;">연간 내역 없음</td></tr>`;
+        } else if (searchKeyword === '') {
+            keywordYearlyBody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#94a3b8;">키워드를 입력하면 연도별 총합이 표시됩니다.</td></tr>`;
+        }
 
         Object.keys(yearlyMap).sort().forEach(year => {
             const yData = yearlyMap[year];
-            const net = yData.inc - yData.exp;
+            const net = yData.inc - yData.totalExp;
+
             yearlyBody.innerHTML += `
                 <tr>
                     <td><b>${year}년 전체</b></td>
                     <td class="amount">${fmt(yData.inc)}</td>
-                    <td class="amount" style="color:var(--danger);">${fmt(yData.exp)}</td>
+                    <td class="amount">${fmt(yData.fix)}</td>
+                    <td class="amount" style="color:#d97706;">${fmt(yData.flex)}</td>
+                    <td class="amount">${fmt(yData.tong)}</td>
+                    <td class="amount" style="color:var(--danger);">${fmt(yData.totalExp)}</td>
                     <td class="amount" style="color:${net >= 0 ? 'var(--success)' : 'var(--danger)'}">${fmt(net)}</td>
                 </tr>`;
         });
@@ -2010,8 +2160,6 @@
         link.download = `가계부_${curKey}.csv`;
         link.click();
     }
-
-    document.getElementById('varDate').value = new Date().toISOString().substring(0, 10);
 </script>
 
 </body>
