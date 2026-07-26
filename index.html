@@ -154,7 +154,7 @@
             </div>
             <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 업로드</button>
             <button class="btn btn-green" onclick="openFamilyModal()">👥 가족 연동</button>
-            <button class="btn btn-green" onclick="manualSaveCloudData()">서버 저장</button>
+            <button class="btn btn-green" id="manualSaveBtn">서버 저장</button>
             <button class="btn btn-sub" onclick="exportToCSV()">엑셀 내보내기</button>
             <button class="btn btn-warn" onclick="openPasswordModal()">암호변경</button>
             <button class="btn btn-danger" onclick="handleLogout()">로그아웃</button>
@@ -450,7 +450,7 @@
         </div>
         <div style="display:flex; gap:10px;">
             <button class="btn btn-green" style="flex:1; padding:10px;" onclick="connectFamilyAccount()">가족 아이디로 연동하기</button>
-            <button class="btn" style="flex:1; padding:10px; background:#475569;" onclick="setSharedFamilyMode()">공용 가계부로 접속</button>
+            <button class="btn" style="flex:1; padding:10px; background:#475569;" onclick="setSharedFamilyMode()">개인 고유 가계부로 접속</button>
         </div>
         <div style="text-align:right; margin-top: 15px;">
             <button class="btn btn-danger" onclick="closeFamilyModal()">닫기</button>
@@ -494,8 +494,7 @@
     const db = firebase.firestore();
 
     let allCloudData = {};
-    let currentEditingTarget = '';
-    let currentTargetDocId = 'shared_data';
+    let currentEditingTarget = 'shared_data';
     let currentUserEmail = '';
     let isDataDirty = false;
 
@@ -506,6 +505,17 @@
             document.getElementById('rememberEmailCheck').checked = true;
         }
         setupDragAndDrop();
+
+        // [서버 저장] 버튼 클릭 시 확실하게 저장 및 알림창 띄우기
+        document.getElementById('manualSaveBtn').addEventListener('click', function() {
+            db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
+                isDataDirty = false;
+                document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
+                alert('저장되었습니다.');
+            }).catch(err => {
+                alert('저장에 실패했습니다. 오류 메시지: ' + err.message);
+            });
+        });
 
         setInterval(() => {
             if (isDataDirty && auth.currentUser) {
@@ -605,9 +615,10 @@
     }
 
     window.setSharedFamilyMode = function() {
-        currentTargetDocId = 'shared_data';
+        const safeEmailId = auth.currentUser.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        currentTargetDocId = `user_${safeEmailId}`;
         localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
-        alert('공용 가계부 모드로 전환되었습니다.');
+        alert('개인 고유 가계부 모드로 전환되었습니다.');
         closeFamilyModal();
         fetchCloudData();
     }
@@ -658,7 +669,9 @@
             if (savedLink) {
                 currentTargetDocId = savedLink;
             } else {
-                currentTargetDocId = 'shared_data';
+                // 기본적으로 로그인한 계정 고유의 문서 ID 사용
+                const safeEmailId = currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                currentTargetDocId = `user_${safeEmailId}`;
             }
 
             fetchCloudData();
@@ -669,8 +682,7 @@
     });
 
     function fetchCloudData() {
-        const isShared = currentTargetDocId === 'shared_data';
-        let displayTarget = isShared ? '공용 가계부' : currentTargetDocId.replace('family_', '').replace(/_/g, '@');
+        let displayTarget = currentTargetDocId.includes('family_') ? currentTargetDocId.replace('family_', '').replace(/_/g, '@') : '개인 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
@@ -690,16 +702,6 @@
             allCloudData.familyTitle = newTitle.trim();
             saveCloudData();
         }
-    }
-
-    window.manualSaveCloudData = function() {
-        db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
-            isDataDirty = false;
-            document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
-            alert('저장되었습니다.');
-        }).catch(err => {
-            alert('저장에 실패했습니다. 오류 메시지: ' + err.message);
-        });
     }
 
     function saveCloudData() {
