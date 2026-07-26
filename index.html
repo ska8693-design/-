@@ -95,12 +95,16 @@
         .btn-danger { background: var(--danger); padding: 3px 6px; font-size: 0.75rem; }
         .btn-sub { background: #0284c7; font-size: 0.75rem; padding: 4px 8px; }
 
-        .badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 0.75rem; background: #e2e8f0; color: #475569; }
-        .badge.main-exp { background: #dbeafe; color: #1e40af; font-weight: bold; }
-        .badge.flex-exp { background: #fef3c7; color: #b45309; font-weight: bold; }
-        .badge.asset { background: #dcfce7; color: #15803d; }
-        .badge.loan { background: #fee2e2; color: #b91c1c; }
-        .badge.sub-memo { background: #f1f5f9; color: #64748b; }
+        /* 다채로운 배지 스타일 정의 */
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.75rem; font-weight: bold; }
+        .badge-color-0 { background: #dbeafe; color: #1e40af; }
+        .badge-color-1 { background: #dcfce7; color: #15803d; }
+        .badge-color-2 { background: #fef3c7; color: #b45309; }
+        .badge-color-3 { background: #f3e8ff; color: #7e22ce; }
+        .badge-color-4 { background: #fee2e2; color: #b91c1c; }
+        .badge-color-5 { background: #cffafe; color: #0e7490; }
+        .badge-color-6 { background: #ffedd5; color: #c2410c; }
+        .badge-color-7 { background: #e0e7ff; color: #3730a3; }
 
         .toggle-box { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; background: #f1f5f9; padding: 6px 12px; border-radius: 6px; }
         .toggle-box input { width: 16px; height: 16px; cursor: pointer; }
@@ -255,7 +259,7 @@
                         </div>
                         <input type="text" id="carryOverInput" placeholder="이월금 직접 입력" disabled oninput="formatInputComma(this); saveManualCarry();">
                     </div>
-                    <div style="font-size:0.8rem; color:var(--text-muted);" id="carryStatusText">현재: 전월 최종 잔액 자동 연동 중</div>
+                    <div style="font-size:0.8rem; color:var(--text-muted);" id="carryStatusText">현재: 전월 통장 잔액 자동 연동 중</div>
                 </div>
 
                 <!-- 동적 섹션들이 렌더링되는 메인 영역 -->
@@ -980,6 +984,14 @@
         return allCloudData.categories[type];
     }
 
+    // 항목별 고유 색상(배지 클래스) 자동 부여 함수
+    function getBadgeClass(catName, type) {
+        const cats = getCategories(type);
+        let idx = cats.indexOf(catName);
+        if (idx === -1) idx = catName.length;
+        return `badge-color-${idx % 8}`;
+    }
+
     window.openSectionManagerModal = function() {
         document.getElementById('sectionManagerModal').classList.add('active');
         renderSectionManagerList();
@@ -1071,6 +1083,7 @@
             const select = document.getElementById(selectId);
             if (!select) return;
             let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+            html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 소항목 관리(추가/수정/삭제)...</option>`;
             select.innerHTML = html;
         };
 
@@ -1078,6 +1091,90 @@
         renderOptions('flex', 'flexCategory');
         renderOptions('variable', 'varCategory');
         renderOptions('asset', 'assetType');
+    }
+
+    window.checkCategoryOption = function(targetType, selectElem) {
+        if (selectElem.value === '__MANAGE__') {
+            openCategoryModal(targetType);
+            selectElem.selectedIndex = 0;
+        }
+    }
+
+    function openCategoryModal(targetType) {
+        currentEditingTarget = targetType;
+        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '자산/대출 소항목 관리' };
+        document.getElementById('modalTitle').innerText = titles[targetType] || '소항목 관리';
+        document.getElementById('categoryModal').classList.add('active');
+        renderModalCatList();
+    }
+
+    window.closeCategoryModal = function() {
+        document.getElementById('categoryModal').classList.remove('active');
+        renderCategorySelects();
+        render();
+    }
+
+    function renderModalCatList() {
+        const cats = getCategories(currentEditingTarget);
+        const ul = document.getElementById('modalCatList');
+        ul.innerHTML = '';
+        cats.forEach((cat, idx) => {
+            ul.innerHTML += `
+                <li>
+                    <span style="font-weight:600;">${cat}</span>
+                    <div style="display:flex; gap:4px; align-items:center;">
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▲</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, 1)" ${idx === cats.length - 1 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▼</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editModalCat(${idx})">수정</button>
+                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteModalCat(${idx})">삭제</button>
+                    </div>
+                </li>`;
+        });
+    }
+
+    window.moveCatOrder = function(idx, direction) {
+        const cats = getCategories(currentEditingTarget);
+        const targetIdx = idx + direction;
+        if (targetIdx < 0 || targetIdx >= cats.length) return;
+        const temp = cats[idx];
+        cats[idx] = cats[targetIdx];
+        cats[targetIdx] = temp;
+        saveCloudData();
+        renderModalCatList();
+    }
+
+    window.addModalCategory = function() {
+        const input = document.getElementById('modalNewCatName');
+        const name = input.value.trim();
+        if (!name) return alert('항목명을 입력해주세요.');
+        const cats = getCategories(currentEditingTarget);
+        if (!cats.includes(name)) {
+            cats.push(name);
+            saveCloudData();
+            renderModalCatList();
+            input.value = '';
+        } else {
+            alert('이미 존재하는 항목명입니다.');
+        }
+    }
+
+    window.editModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
+        if (newName && newName.trim() !== '') {
+            cats[idx] = newName.trim();
+            saveCloudData();
+            renderModalCatList();
+        }
+    }
+
+    window.deleteModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
+            cats.splice(idx, 1);
+            saveCloudData();
+            renderModalCatList();
+        }
     }
 
     window.openAiModal = function() {
@@ -1338,7 +1435,6 @@
         return getStoredDataForMonth(monthKey);
     }
 
-    // 통장 총 잔액을 계산하는 헬퍼 함수 (전월 이월금 + 수입 - 변동고정비 - 통생활비)
     function calculateTotalBalanceFor(monthKey) {
         const data = getStoredData(monthKey);
         const carry = getCalculatedCarryOver(monthKey);
@@ -1357,7 +1453,6 @@
         return carry + inc - flex - tong;
     }
 
-    // 전월의 실제 [통장 총 잔액]을 다음 달 [전월 이월금]으로 정확히 연동
     function getCalculatedCarryOver(monthKey) {
         const data = getStoredData(monthKey);
         if (data.isManualCarry) return data.manualCarryVal || 0;
@@ -1380,7 +1475,7 @@
         render();
     }
 
-    // 동적 섹션들을 화면에 렌더링하는 핵심 함수
+    // 동적 섹션들을 화면에 렌더링하는 핵심 함수 (분류별/가나다순 정렬 적용)
     function render() {
         renderCategorySelects();
         const curKey = getMonthKey();
@@ -1401,7 +1496,7 @@
         let totalFixed = 0;
         let totalFlex = 0;
         let totalTongTotal = 0;
-        let totalAssetBase = 0; // 기초자산 총액 (가용 자금 계산 시 제외하기 위함)
+        let totalAssetBase = 0;
         const subCatMap = {};
 
         let totalAssetsReg = 0, totalLoans = 0;
@@ -1412,12 +1507,14 @@
 
         defs.forEach((sec, index) => {
             if (!data[sec.id]) data[sec.id] = [];
-            const items = data[sec.id];
+            let items = [...data[sec.id]];
 
             let sectionTableHtml = '';
             let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
 
             if (sec.type === 'income') {
+                // 수입 내역 정렬: 성명 → 항목 가나다순
+                items.sort((a, b) => (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
                 let rows = '';
                 items.forEach(item => {
                     if (sec.includeCalc) totalIncome += item.amount;
@@ -1442,15 +1539,25 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'expense') {
+                // 고정/변동고정비 정렬: 분류(대분류순) → 내역 가나다순
+                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
+                let catOrder = getCategories(catKey);
+                items.sort((a, b) => {
+                    let posA = catOrder.indexOf(a.cat);
+                    let posB = catOrder.indexOf(b.cat);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.desc || '').localeCompare(b.desc || '');
+                });
+
                 let rows = '';
                 items.forEach(item => {
                     if (sec.includeCalc) {
                         if (sec.id === 'fixedExpenses') totalFixed += item.amount;
                         else totalFlex += item.amount;
                     }
-                    rows += `<tr><td><span class="badge">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                    let badgeCls = getBadgeClass(item.cat, catKey);
+                    rows += `<tr><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
-                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
                 sectionTableHtml = `
                     <div class="section-box">
                         <div class="section-header">
@@ -1470,6 +1577,17 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'variable') {
+                // 생활비 정렬: 날짜순 → 분류순
+                let varOrder = getCategories('variable');
+                items.sort((a, b) => {
+                    let dateComp = (a.date || '').localeCompare(b.date || '');
+                    if (dateComp !== 0) return dateComp;
+                    let posA = varOrder.indexOf(a.cat);
+                    let posB = varOrder.indexOf(b.cat);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.desc || '').localeCompare(b.desc || '');
+                });
+
                 let rows = '';
                 items.forEach(item => {
                     const isTong = item.cat === '통 생활비';
@@ -1480,7 +1598,8 @@
                             subCatMap[item.cat] += item.amount;
                         }
                     }
-                    rows += `<tr><td>${item.date || '-'}</td><td><span class="${isTong ? 'badge main-exp' : 'badge sub-memo'}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                    let badgeCls = isTong ? 'badge main-exp' : getBadgeClass(item.cat, 'variable');
+                    rows += `<tr><td>${item.date || '-'}</td><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${isTong ? fmt(item.amount) : `<span style="color:#64748b;">(세부) ${fmt(item.amount)}</span>`}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
                 sectionTableHtml = `
                     <div class="section-box">
@@ -1502,6 +1621,15 @@
                         </table>
                     </div>`;
             } else if (sec.type === 'asset') {
+                // 자산 정렬: 구분(유형)순 → 항목명순
+                let assetOrder = getCategories('asset');
+                items.sort((a, b) => {
+                    let posA = assetOrder.indexOf(a.type);
+                    let posB = assetOrder.indexOf(b.type);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+
                 let rows = '';
                 items.forEach(item => {
                     if (sec.includeCalc) {
@@ -1512,7 +1640,8 @@
                             totalAssetBase += item.val;
                         }
                     }
-                    rows += `<tr><td><span class="badge ${item.type === '대출잔액' ? 'badge loan' : 'badge asset'}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                    let badgeCls = item.type === '대출잔액' ? 'badge loan' : getBadgeClass(item.type, 'asset');
+                    rows += `<tr><td><span class="badge ${badgeCls}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
                 });
                 sectionTableHtml = `
                     <div class="section-box">
@@ -1576,90 +1705,8 @@
         const select = document.getElementById(selectId);
         if (!select) return;
         let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+        html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 소항목 관리(추가/수정/삭제)...</option>`;
         select.innerHTML = html;
-    }
-
-    window.checkCategoryOption = function(targetType, selectElem) {
-        if (selectElem.value === '__MANAGE__') {
-            openCategoryModal(targetType);
-            selectElem.selectedIndex = 0;
-        }
-    }
-
-    function openCategoryModal(targetType) {
-        currentEditingTarget = targetType;
-        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '자산/대출 소항목 관리' };
-        document.getElementById('modalTitle').innerText = titles[targetType] || '항목 관리';
-        document.getElementById('categoryModal').classList.add('active');
-        renderModalCatList();
-    }
-
-    window.closeCategoryModal = function() {
-        document.getElementById('categoryModal').classList.remove('active');
-        renderCategorySelects();
-    }
-
-    function renderModalCatList() {
-        const cats = getCategories(currentEditingTarget);
-        const ul = document.getElementById('modalCatList');
-        ul.innerHTML = '';
-        cats.forEach((cat, idx) => {
-            ul.innerHTML += `
-                <li>
-                    <span style="font-weight:600;">${cat}</span>
-                    <div style="display:flex; gap:4px; align-items:center;">
-                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▲</button>
-                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, 1)" ${idx === cats.length - 1 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▼</button>
-                        <button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editModalCat(${idx})">수정</button>
-                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteModalCat(${idx})">삭제</button>
-                    </div>
-                </li>`;
-        });
-    }
-
-    window.moveCatOrder = function(idx, direction) {
-        const cats = getCategories(currentEditingTarget);
-        const targetIdx = idx + direction;
-        if (targetIdx < 0 || targetIdx >= cats.length) return;
-        const temp = cats[idx];
-        cats[idx] = cats[targetIdx];
-        cats[targetIdx] = temp;
-        saveCloudData();
-        renderModalCatList();
-    }
-
-    window.addModalCategory = function() {
-        const input = document.getElementById('modalNewCatName');
-        const name = input.value.trim();
-        if (!name) return alert('항목명을 입력해주세요.');
-        const cats = getCategories(currentEditingTarget);
-        if (!cats.includes(name)) {
-            cats.push(name);
-            saveCloudData();
-            renderModalCatList();
-            input.value = '';
-        } else {
-            alert('이미 존재하는 항목명입니다.');
-        }
-    }
-
-    window.editModalCat = function(idx) {
-        const cats = getCategories(currentEditingTarget);
-        const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
-        if (newName && newName.trim() !== '') {
-            cats[idx] = newName.trim();
-            saveCloudData();
-            renderModalCatList();
-        }
-    }
-
-    window.deleteModalCat = function(idx) {
-        const cats = getCategories(currentEditingTarget);
-        if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
-            cats.splice(idx, 1);
-            saveCloudData();
-            renderModalCatList();
-        }
     }
 
     window.addCustomIncome = function(secId) {
