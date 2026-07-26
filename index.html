@@ -107,13 +107,13 @@
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
         .modal-overlay.active { display: flex; }
-        .modal-box { background: white; border-radius: 12px; padding: 20px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
+        .modal-box { background: white; border-radius: 12px; padding: 20px; width: 90%; max-width: 550px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; font-weight: bold; }
         
         .drop-zone { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 25px; text-align: center; background: #f8fafc; cursor: pointer; transition: 0.2s; margin-bottom: 15px; }
         .drop-zone:hover, .drop-zone.dragover { background: #eff6ff; border-color: var(--accent); }
         .drop-zone p { font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; }
-        .cat-item-list { list-style: none; max-height: 200px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px; text-align: left; }
+        .cat-item-list { list-style: none; max-height: 200px; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 6px; }
         .cat-item-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
     </style>
 </head>
@@ -393,20 +393,6 @@
     </div>
 </div>
 
-<!-- 알림 커스텀 팝업 모달 -->
-<div class="modal-overlay" id="customAlertModal">
-    <div class="modal-box">
-        <div class="modal-header">
-            <span id="customAlertTitle">알림</span>
-            <span style="cursor:pointer; font-size:1.2rem;" onclick="closeCustomAlert()">&times;</span>
-        </div>
-        <p id="customAlertMessage" style="font-size: 0.95rem; margin-bottom: 20px; color: var(--text);">메시지 내용</p>
-        <div style="text-align: center;">
-            <button class="btn" style="padding: 8px 20px;" onclick="closeCustomAlert()">확인</button>
-        </div>
-    </div>
-</div>
-
 <!-- 카테고리 관리 모달 -->
 <div class="modal-overlay" id="categoryModal">
     <div class="modal-box">
@@ -491,7 +477,7 @@
     </div>
 </div>
 
-<!-- 스크립트 실행 -->
+<!-- 자바스크립트 전체 코드 -->
 <script>
     const firebaseConfig = {
         apiKey: "AIzaSyDWFPrJKmGvuL8qfPuKO6P23eaOJ8Eszbc",
@@ -512,17 +498,6 @@
     let currentTargetDocId = 'shared_data';
     let currentUserEmail = '';
     let isDataDirty = false;
-
-    // 커스텀 팝업창 함수
-    function showCustomAlert(title, message) {
-        document.getElementById('customAlertTitle').innerText = title;
-        document.getElementById('customAlertMessage').innerText = message;
-        document.getElementById('customAlertModal').classList.add('active');
-    }
-
-    function closeCustomAlert() {
-        document.getElementById('customAlertModal').classList.remove('active');
-    }
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -565,14 +540,14 @@
         auth.setPersistence(persistenceType).then(() => {
             return auth.signInWithEmailAndPassword(email, pw);
         }).catch(err => {
-            showCustomAlert('로그인 실패', err.message);
+            alert('로그인 실패: ' + err.message);
         });
     }
 
     window.handleGoogleLogin = function() {
         const provider = new firebase.auth.GoogleAuthProvider();
         auth.signInWithPopup(provider).catch(err => {
-            showCustomAlert('구글 로그인 실패', err.message);
+            alert('구글 로그인 실패: ' + err.message);
         });
     }
 
@@ -580,19 +555,19 @@
         const email = document.getElementById('loginEmail').value;
         const pw = document.getElementById('loginPassword').value;
         auth.createUserWithEmailAndPassword(email, pw).then(() => {
-            showCustomAlert('성공', '계정이 생성되었습니다!');
-        }).catch(err => showCustomAlert('회원가입 실패', err.message));
+            alert('계정이 생성되었습니다!');
+        }).catch(err => alert('회원가입 실패: ' + err.message));
     }
 
     window.handleForgotPassword = function() {
         const email = document.getElementById('loginEmail').value;
         if (!email) {
-            showCustomAlert('안내', '먼저 상단 아이디(이메일) 칸에 가입하신 이메일을 입력해 주세요.');
+            alert('먼저 상단 아이디(이메일) 칸에 가입하신 이메일을 입력해 주세요.');
             return;
         }
         auth.sendPasswordResetEmail(email).then(() => {
-            showCustomAlert('전송 완료', '비밀번호 재설정 메일이 전송되었습니다! 이메일을 확인해 주세요.');
-        }).catch(err => showCustomAlert('전송 실패', err.message));
+            alert('비밀번호 재설정 메일이 전송되었습니다! 이메일을 확인해 주세요.');
+        }).catch(err => alert('전송 실패: ' + err.message));
     }
 
     window.openPasswordModal = function() {
@@ -617,14 +592,14 @@
     window.connectFamilyAccount = function() {
         const emailInput = document.getElementById('targetFamilyEmail').value.trim();
         if (!emailInput) {
-            showCustomAlert('안내', '연동할 가족의 아이디(이메일)를 입력해주세요.');
+            alert('연동할 가족의 아이디(이메일)를 입력해주세요.');
             return;
         }
         const safeId = emailInput.toLowerCase().replace(/[^a-z0-9]/g, '_');
         currentTargetDocId = `family_${safeId}`;
         localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
         
-        showCustomAlert('연동 완료', `[${emailInput}] 계정과 연동되었습니다! 해당 가계부 데이터를 공유합니다.`);
+        alert(`[${emailInput}] 계정과 연동되었습니다! 해당 가계부 데이터를 공유합니다.`);
         closeFamilyModal();
         fetchCloudData();
     }
@@ -632,7 +607,7 @@
     window.setSharedFamilyMode = function() {
         currentTargetDocId = 'shared_data';
         localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
-        showCustomAlert('모드 변경', '공용 가계부 모드로 전환되었습니다.');
+        alert('공용 가계부 모드로 전환되었습니다.');
         closeFamilyModal();
         fetchCloudData();
     }
@@ -643,15 +618,15 @@
         const confirmPw = document.getElementById('confirmPasswordInput').value;
 
         if (!curPw || !newPw || !confirmPw) {
-            showCustomAlert('안내', '모든 비밀번호 입력란을 채워주세요.');
+            alert('모든 비밀번호 입력란을 채워주세요.');
             return;
         }
         if (newPw.length < 6) {
-            showCustomAlert('안내', '새 비밀번호는 6자리 이상이어야 합니다.');
+            alert('새 비밀번호는 6자리 이상이어야 합니다.');
             return;
         }
         if (newPw !== confirmPw) {
-            showCustomAlert('안내', '새 비밀번호와 확인란의 입력값이 일치하지 않습니다.');
+            alert('새 비밀번호와 확인란의 입력값이 일치하지 않습니다.');
             return;
         }
 
@@ -660,11 +635,11 @@
             const credential = firebase.auth.EmailAuthProvider.credential(user.email, curPw);
             user.reauthenticateWithCredential(credential).then(() => {
                 user.updatePassword(newPw).then(() => {
-                    showCustomAlert('변경 성공', '비밀번호가 성공적으로 변경되었습니다!');
+                    alert('비밀번호가 성공적으로 변경되었습니다!');
                     closePasswordModal();
-                }).catch(err => showCustomAlert('변경 실패', err.message));
+                }).catch(err => alert('변경 실패: ' + err.message));
             }).catch(err => {
-                showCustomAlert('인증 실패', '기존 비밀번호가 일치하지 않습니다.');
+                alert('기존 비밀번호가 일치하지 않습니다.');
             });
         }
     }
@@ -717,14 +692,13 @@
         }
     }
 
-    // 서버 저장 버튼 클릭 시 커스텀 모달 팝업으로 결과 표시
     window.manualSaveCloudData = function() {
         db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
             isDataDirty = false;
             document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
-            showCustomAlert('저장 완료', '저장되었습니다.');
+            alert('저장되었습니다.');
         }).catch(err => {
-            showCustomAlert('저장 실패', '저장에 실패했습니다. 오류 메시지: ' + err.message);
+            alert('저장에 실패했습니다. 오류 메시지: ' + err.message);
         });
     }
 
@@ -755,7 +729,8 @@
 
     function parseAmount(valStr) {
         if (!valStr) return 0;
-        return Number(String(valStr).replace(/,/g, '')) || 0;
+        let cleanVal = String(valStr).replace(/[^0-9]/g, '');
+        return Number(cleanVal) || 0;
     }
 
     function fmt(num) {
@@ -844,10 +819,7 @@
     window.addModalCategory = function() {
         const input = document.getElementById('modalNewCatName');
         const name = input.value.trim();
-        if (!name) {
-            showCustomAlert('안내', '항목명을 입력해주세요.');
-            return;
-        }
+        if (!name) return alert('항목명을 입력해주세요.');
         const cats = getCategories(currentEditingTarget);
         if (!cats.includes(name)) {
             cats.push(name);
@@ -855,7 +827,7 @@
             renderModalCatList();
             input.value = '';
         } else {
-            showCustomAlert('안내', '이미 존재하는 항목명입니다.');
+            alert('이미 존재하는 항목명입니다.');
         }
     }
 
@@ -1021,13 +993,13 @@
                 if (totalAdded > 0) {
                     saveCloudData();
                     render();
-                    showCustomAlert('업로드 성공', `총 ${totalAdded}건의 내역과 비고란이 반영되었습니다.`);
+                    alert(`엑셀 업로드 성공! 총 ${totalAdded}건의 내역과 비고란이 반영되었습니다.`);
                     closeAiModal();
                 } else {
-                    showCustomAlert('안내', '엑셀에서 읽어올 데이터를 찾지 못했습니다.');
+                    alert('엑셀에서 읽어올 데이터를 찾지 못했습니다.');
                 }
             } catch (err) {
-                showCustomAlert('파일 읽기 오류', err.message);
+                alert('파일 읽기 오류: ' + err.message);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -1035,21 +1007,12 @@
 
     window.processAiSmartInput = function() {
         const text = document.getElementById('aiSmartText').value.trim();
-        if (!text) {
-            showCustomAlert('안내', '입력 내용을 적어주세요.');
-            return;
-        }
+        if (!text) return alert('입력 내용을 적어주세요.');
 
         const numbers = text.match(/[\d,]+/g);
-        if (!numbers || numbers.length === 0) {
-            showCustomAlert('안내', '금액 숫자를 인식할 수 없습니다.');
-            return;
-        }
+        if (!numbers || numbers.length === 0) return alert('금액 숫자를 인식할 수 없습니다.');
         const amount = parseAmount(numbers[numbers.length - 1]);
-        if (amount <= 0) {
-            showCustomAlert('안내', '올바른 금액을 입력해주세요.');
-            return;
-        }
+        if (amount <= 0) return alert('올바른 금액을 입력해주세요.');
 
         let textPart = text.replace(numbers[numbers.length - 1], '').trim();
         const curKey = getMonthKey();
@@ -1060,7 +1023,7 @@
             if (textPart.includes('정훈') || textPart.includes('남정훈')) name = '남정훈';
             if (textPart.includes('정화') || textPart.includes('임정화')) name = '임정화';
             monthData.incomes.push({ id: Date.now(), name, desc: textPart || '수입', amount, note: '' });
-            showCustomAlert('AI 자동 분류', `[수입] '${name}' 공동 내역 추가 완료! (${fmt(amount)})`);
+            alert(`[AI 자동 분류: 수입] '${name}' 공동 내역 추가 완료! (${fmt(amount)})`);
         } else if (textPart.includes('대출') || textPart.includes('보험') || textPart.includes('계') || textPart.includes('적금')) {
             let cat = '기타 고정';
             if (textPart.includes('대출')) cat = '대출 상환';
@@ -1068,14 +1031,14 @@
             else if (textPart.includes('계')) cat = '계모임/경조사';
             
             monthData.fixedExpenses.push({ id: Date.now(), cat, desc: textPart, amount, note: '' });
-            showCustomAlert('AI 자동 분류', `[고정지출] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
+            alert(`[AI 자동 분류: 고정지출] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
         } else {
             const varCats = getCategories('variable');
             let cat = '통 생활비';
             varCats.forEach(c => { if (textPart.includes(c)) cat = c; });
             const todayStr = `${curKey}-01`;
             monthData.variableExpenses.push({ id: Date.now(), date: todayStr, cat, desc: textPart || '지출', amount, note: '' });
-            showCustomAlert('AI 자동 분류', `[생활비] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
+            alert(`[AI 자동 분류: 생활비] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
         }
 
         saveCloudData();
@@ -1090,7 +1053,7 @@
         const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
 
         if (!allCloudData[prevKey] || !allCloudData[prevKey][sectionKey] || allCloudData[prevKey][sectionKey].length === 0) {
-            showCustomAlert('안내', `이전 달(${prevKey})에 해당 섹션에 저장된 데이터가 없습니다.`);
+            alert(`이전 달(${prevKey})에 해당 섹션에 저장된 데이터가 없습니다.`);
             return;
         }
 
@@ -1118,9 +1081,9 @@
 
         if (addedCount > 0) {
             saveData(curData);
-            showCustomAlert('불러오기 성공', `지난달(${prevKey})에서 ${addedCount}개의 항목을 성공적으로 불러왔습니다!`);
+            alert(`지난달(${prevKey})에서 ${addedCount}개의 항목을 성공적으로 불러왔습니다!`);
         } else {
-            showCustomAlert('안내', '이미 모든 항목이 이번 달에 존재합니다.');
+            alert('이미 모든 항목이 이번 달에 존재합니다.');
         }
     }
 
@@ -1295,10 +1258,7 @@
         const desc = document.getElementById('incDesc').value;
         const amount = parseAmount(document.getElementById('incAmount').value);
         const note = document.getElementById('incNote').value.trim();
-        if (!desc || !amount) {
-            showCustomAlert('안내', '항목과 금액을 입력해주세요.');
-            return;
-        }
+        if (!desc || !amount) return alert('항목과 금액을 입력해주세요.');
         const data = getStoredData(getMonthKey());
         data.incomes.push({ id: Date.now(), name: name || '공통', desc, amount, note });
         saveData(data);
@@ -1312,10 +1272,7 @@
         const desc = document.getElementById('fixDesc').value;
         const amount = parseAmount(document.getElementById('fixAmount').value);
         const note = document.getElementById('fixNote').value.trim();
-        if (!desc || !amount) {
-            showCustomAlert('안내', '내역과 금액을 입력해주세요.');
-            return;
-        }
+        if (!desc || !amount) return alert('내역과 금액을 입력해주세요.');
         const data = getStoredData(getMonthKey());
         data.fixedExpenses.push({ id: Date.now(), cat, desc, amount, note });
         saveData(data);
@@ -1329,10 +1286,7 @@
         const desc = document.getElementById('flexDesc').value;
         const amount = parseAmount(document.getElementById('flexAmount').value);
         const note = document.getElementById('flexNote').value.trim();
-        if (!desc || !amount) {
-            showCustomAlert('안내', '내역과 금액을 입력해주세요.');
-            return;
-        }
+        if (!desc || !amount) return alert('내역과 금액을 입력해주세요.');
         const data = getStoredData(getMonthKey());
         data.flexExpenses.push({ id: Date.now(), cat, desc, amount, note });
         saveData(data);
@@ -1347,10 +1301,7 @@
         const desc = document.getElementById('varDesc').value;
         const amount = parseAmount(document.getElementById('varAmount').value);
         const note = document.getElementById('varNote').value.trim();
-        if (!desc || !amount) {
-            showCustomAlert('안내', '내역과 금액을 입력해주세요.');
-            return;
-        }
+        if (!desc || !amount) return alert('내역과 금액을 입력해주세요.');
         const data = getStoredData(getMonthKey());
         data.variableExpenses.push({ id: Date.now(), date, cat, desc, amount, note });
         saveData(data);
@@ -1364,10 +1315,7 @@
         const name = document.getElementById('assetName').value;
         const val = parseAmount(document.getElementById('assetVal').value);
         const note = document.getElementById('assetNote').value.trim();
-        if (!name || !val) {
-            showCustomAlert('안내', '항목명과 금액을 정확히 입력해주세요.');
-            return;
-        }
+        if (!name || !val) return alert('항목명과 금액을 정확히 입력해주세요.');
         const data = getStoredData(getMonthKey());
         data.assetItems.push({ id: Date.now(), type, name, val, note });
         saveData(data);
@@ -1522,9 +1470,33 @@
         const curKey = getMonthKey();
         const data = getStoredData(curKey);
         let csvStr = '\uFEFF';
+        
         csvStr += `[${allCloudData.familyTitle || '우리집'} 가계부 - ${curKey} 내역]\n\n`;
+        
+        // 1. 수입 내역
         csvStr += `1. 수입 내역\n성명,항목,금액,비고\n`;
         (data.incomes || []).forEach(x => { csvStr += `"${x.name}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+        csvStr += `\n`;
+
+        // 2. 고정 지출 내역
+        csvStr += `2. 고정 지출 내역\n분류,내역,금액,비고\n`;
+        (data.fixedExpenses || []).forEach(x => { csvStr += `"${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+        csvStr += `\n`;
+
+        // 3. 변동 고정비 내역
+        csvStr += `3. 변동 고정비 내역\n분류,내역,금액,비고\n`;
+        (data.flexExpenses || []).forEach(x => { csvStr += `"${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+        csvStr += `\n`;
+
+        // 4. 생활비 지출 내역
+        csvStr += `4. 생활비 지출 내역\n날짜,분류,내역,금액,비고\n`;
+        (data.variableExpenses || []).forEach(x => { csvStr += `"${x.date || ''}","${x.cat}","${x.desc}",${x.amount},"${x.note || ''}"\n`; });
+        csvStr += `\n`;
+
+        // 5. 기초자산 / 누적자산 및 대출 잔액
+        csvStr += `5. 자산 및 대출 내역\n구분,항목명,금액,비고\n`;
+        (data.assetItems || []).forEach(x => { csvStr += `"${x.type}","${x.name}",${x.val},"${x.note || ''}"\n`; });
+
         const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
