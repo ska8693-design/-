@@ -445,36 +445,53 @@
     </div>
 </div>
 
-<!-- 가족 계정 연동 모달 -->
+<!-- 가족 계정 연동 모달 (양방향 초대, 연동 요청, 자유로운 전환 및 해제 지원) -->
 <div class="modal-overlay" id="familyModal">
     <div class="modal-box">
         <div class="modal-header">
-            <span>👥 가족 계정 연동 및 초대 관리</span>
+            <span>👥 가족 가계부 연동 및 관리</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeFamilyModal()">&times;</span>
         </div>
         
-        <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
-            상대방에게 가계부 초대장을 보내고, 상대방이 수락해야 연동이 완료됩니다.
+        <!-- 현재 연동 상태 및 전환 패널 -->
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
+            <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
+            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
+            <div style="display:flex; gap:8px;">
+                <button class="btn" style="flex:1; background:#475569; padding:6px;" onclick="switchToMyPersonalBudget()">내 개인 가계부 보기</button>
+                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px; display:none;" onclick="switchToLinkedBudget()">연동된 공유 가계부 보기</button>
+                <button class="btn btn-danger" id="unlinkBtn" style="padding:6px; display:none;" onclick="unlinkFamilyAccount()">연동 해제</button>
+            </div>
         </div>
 
+        <!-- 1. 내 가계부로 초대하기 -->
         <div style="margin-bottom: 15px;">
-            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">초대할 가족 아이디 (이메일)</label>
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">1️⃣ 내 가계부로 가족 초대하기</label>
             <div style="display:flex; gap:6px;">
-                <input type="email" id="targetFamilyEmail" placeholder="예: family@naver.com" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:6px; font-size:0.9rem;">
+                <input type="email" id="targetFamilyEmail" placeholder="상대방 이메일 입력" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:6px; font-size:0.9rem;">
                 <button class="btn btn-green" onclick="sendFamilyInvitation()">초대장 보내기</button>
             </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">상대방이 수락하면 내 가계부를 함께 보게 됩니다.</div>
         </div>
 
+        <!-- 2. 상대방 가계부로 연동 요청하기 -->
         <div style="margin-bottom: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
-            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">📥 나에게 온 초대 목록</label>
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">2️⃣ 상대방 가계부로 연동 요청하기</label>
+            <div style="display:flex; gap:6px;">
+                <input type="email" id="targetRequestEmail" placeholder="상대방(관리자) 이메일 입력" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:6px; font-size:0.9rem;">
+                <button class="btn btn-purple" onclick="sendConnectionRequest()">연동 요청하기</button>
+            </div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">상대방이 수락하면 상대방의 가계부 화면으로 연동됩니다.</div>
+        </div>
+
+        <!-- 3. 나에게 온 요청 및 초대 목록 -->
+        <div style="margin-bottom: 15px; border-top: 1px solid var(--border); padding-top: 12px;">
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">📥 나에게 온 요청 및 초대 목록</label>
             <div id="incomingInvitesList" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; padding:6px; background:#f8fafc; font-size:0.85rem;">
-                <div style="color:var(--text-muted); text-align:center; padding:10px;">대기 중인 초대장이 없습니다.</div>
+                <div style="color:var(--text-muted); text-align:center; padding:10px;">대기 중인 요청이 없습니다.</div>
             </div>
         </div>
 
-        <div style="display:flex; gap:10px; border-top: 1px solid var(--border); padding-top: 12px;">
-            <button class="btn" style="flex:1; padding:8px; background:#475569;" onclick="setSharedFamilyMode()">내 개인 고유 가계부로 접속</button>
-        </div>
         <div style="text-align:right; margin-top: 12px;">
             <button class="btn btn-danger" onclick="closeFamilyModal()">닫기</button>
         </div>
@@ -517,12 +534,12 @@
     const db = firebase.firestore();
 
     let allCloudData = {};
-    let currentEditingTarget = 'shared_data';
+    let currentTargetDocId = '';
     let currentUserEmail = '';
     let isDataDirty = false;
     let inviteUnsubscribe = null;
     let globalBadgeUnsubscribe = null;
-    let hasAlertedInvite = false; // 중복 알림 방지용
+    let hasAlertedInvite = false;
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -623,6 +640,7 @@
 
     window.openFamilyModal = function() {
         document.getElementById('familyModal').classList.add('active');
+        updateFamilyModalUI();
         listenToIncomingInvites();
     }
 
@@ -634,10 +652,63 @@
         }
     }
 
+    function updateFamilyModalUI() {
+        const uid = auth.currentUser.uid;
+        const linkedKey = `linked_family_${uid}`;
+        const linkedDocId = localStorage.getItem(linkedKey);
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+
+        const statusText = document.getElementById('currentModeStatusText');
+        const switchLinkedBtn = document.getElementById('switchToLinkedBtn');
+        const unlinkBtn = document.getElementById('unlinkBtn');
+
+        if (linkedDocId && linkedDocId !== myPersonalDocId) {
+            statusText.innerText = `현재 연동된 공유 가계부 (${linkedDocId}) 보는 중`;
+            switchLinkedBtn.style.display = 'block';
+            unlinkBtn.style.display = 'block';
+        } else {
+            statusText.innerText = '현재 내 개인 고유 가계부 보는 중';
+            switchLinkedBtn.style.display = linkedDocId && linkedDocId !== myPersonalDocId ? 'block' : 'none';
+            unlinkBtn.style.display = 'none';
+        }
+    }
+
+    window.switchToMyPersonalBudget = function() {
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        currentTargetDocId = myPersonalDocId;
+        closeFamilyModal();
+        fetchCloudData();
+        alert('내 개인 가계부로 전환되었습니다.');
+    }
+
+    window.switchToLinkedBudget = function() {
+        const uid = auth.currentUser.uid;
+        const linkedDocId = localStorage.getItem(`linked_family_${uid}`);
+        if (linkedDocId) {
+            currentTargetDocId = linkedDocId;
+            closeFamilyModal();
+            fetchCloudData();
+            alert('연동된 공유 가계부로 전환되었습니다.');
+        }
+    }
+
+    window.unlinkFamilyAccount = function() {
+        if (confirm('정말 연동을 해제하시겠습니까? 해제 후에는 내 개인 가계부로 전환됩니다.')) {
+            const uid = auth.currentUser.uid;
+            localStorage.removeItem(`linked_family_${uid}`);
+            const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            currentTargetDocId = myPersonalDocId;
+            closeFamilyModal();
+            fetchCloudData();
+            alert('연동이 해제되었습니다.');
+        }
+    }
+
+    // 1. 내 가계부로 초대하기
     window.sendFamilyInvitation = function() {
         const targetEmail = document.getElementById('targetFamilyEmail').value.trim().toLowerCase();
         if (!targetEmail) {
-            alert('초대할 가족의 아이디(이메일)를 입력해주세요.');
+            alert('초대할 가족의 이메일을 입력해주세요.');
             return;
         }
         if (targetEmail === currentUserEmail.toLowerCase()) {
@@ -649,20 +720,50 @@
         const inviteDocId = `invite_${targetEmail.replace(/[^a-z0-9]/g, '_')}_from_${safeMyEmail}`;
 
         db.collection("family_invites").doc(inviteDocId).set({
+            type: 'invite_to_my_budget',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            senderDocId: `user_${safeMyEmail}`,
+            targetDocId: `user_${safeMyEmail}`,
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
-            alert(`[${targetEmail}]님에게 가족 가계부 초대장을 성공적으로 보냈습니다! 상대방이 수락하면 연동됩니다.`);
+            alert(`[${targetEmail}]님에게 내 가계부 초대장을 보냈습니다!`);
             document.getElementById('targetFamilyEmail').value = '';
         }).catch(err => {
             alert('초대 전송 실패: ' + err.message);
         });
     }
 
-    // 로그인 시 백그라운드에서 나에게 온 초대장 감지 및 알림 팝업 띄우기
+    // 2. 상대방 가계부로 연동 요청하기
+    window.sendConnectionRequest = function() {
+        const targetEmail = document.getElementById('targetRequestEmail').value.trim().toLowerCase();
+        if (!targetEmail) {
+            alert('상대방 이메일을 입력해주세요.');
+            return;
+        }
+        if (targetEmail === currentUserEmail.toLowerCase()) {
+            alert('본인 계정에는 연동 요청을 할 수 없습니다.');
+            return;
+        }
+
+        const safeMyEmail = currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        const reqDocId = `req_${targetEmail.replace(/[^a-z0-9]/g, '_')}_from_${safeMyEmail}`;
+
+        db.collection("family_invites").doc(reqDocId).set({
+            type: 'request_to_join',
+            senderEmail: currentUserEmail,
+            receiverEmail: targetEmail,
+            targetDocId: `user_${targetEmail.replace(/[^a-z0-9]/g, '_')}`,
+            status: 'pending',
+            createdAt: Date.now()
+        }).then(() => {
+            alert(`[${targetEmail}]님에게 연동 요청을 보냈습니다!`);
+            document.getElementById('targetRequestEmail').value = '';
+        }).catch(err => {
+            alert('요청 전송 실패: ' + err.message);
+        });
+    }
+
     function startGlobalInviteListener() {
         if (!currentUserEmail) return;
         const myEmailClean = currentUserEmail.toLowerCase();
@@ -679,10 +780,9 @@
                     if (count > 0) {
                         btn.innerHTML = `👥 가족 연동 <span style="background:#dc2626; color:white; padding:1px 6px; border-radius:10px; font-size:0.75rem; font-weight:bold; margin-left:4px;">${count}</span>`;
                         
-                        // 새로운 초대장이 도착했을 때 알림창 띄우기 (최초 1회 또는 새 초대 발생 시)
                         if (!hasAlertedInvite) {
                             hasAlertedInvite = true;
-                            if (confirm('🔔 새로운 가족 가계부 초대장이 도착했습니다! [가족 연동] 창으로 이동하여 수락하시겠습니까?')) {
+                            if (confirm('🔔 새로운 가계부 초대/연동 요청이 도착했습니다! [가족 연동] 창으로 이동하여 확인하시겠습니까?')) {
                                 openFamilyModal();
                             }
                         }
@@ -708,18 +808,20 @@
                 listEl.innerHTML = '';
 
                 if (snapshot.empty) {
-                    listEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:10px;">대기 중인 초대장이 없습니다.</div>';
+                    listEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:10px;">대기 중인 요청이 없습니다.</div>';
                     return;
                 }
 
                 snapshot.forEach(docSnap => {
                     const inv = docSnap.data();
                     const invId = docSnap.id;
+                    let descText = inv.type === 'request_to_join' ? `<b>${inv.senderEmail}</b>님이 연동을 요청했습니다.` : `<b>${inv.senderEmail}</b>님이 초대했습니다.`;
+
                     listEl.innerHTML += `
-                        <div style="display:flex; justify-content:space-between; align-items:center; padding:6px; background:white; border-bottom:1px solid var(--border); border-radius:4px; margin-bottom:4px;">
-                            <span><b>${inv.senderEmail}</b>님의 초대</span>
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; background:white; border-bottom:1px solid var(--border); border-radius:4px; margin-bottom:4px;">
+                            <span style="font-size:0.8rem;">${descText}</span>
                             <div style="display:flex; gap:4px;">
-                                <button class="btn btn-green" style="padding:2px 6px; font-size:0.75rem;" onclick="respondInvitation('${invId}', '${inv.senderDocId}', true)">수락</button>
+                                <button class="btn btn-green" style="padding:2px 6px; font-size:0.75rem;" onclick="respondInvitation('${invId}', '${inv.targetDocId}', true)">수락</button>
                                 <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="respondInvitation('${invId}', '', false)">거부</button>
                             </div>
                         </div>`;
@@ -727,30 +829,21 @@
             });
     }
 
-    window.respondInvitation = function(inviteId, senderDocId, isAccepted) {
+    window.respondInvitation = function(inviteId, targetDocId, isAccepted) {
         if (isAccepted) {
-            currentTargetDocId = senderDocId;
+            currentTargetDocId = targetDocId;
             localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
             
             db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
-                alert('초대를 수락했습니다! 이제 해당 가계부를 함께 공유합니다.');
+                alert('요청을 수락했습니다! 가계부 연동이 완료되었습니다.');
                 closeFamilyModal();
                 fetchCloudData();
             });
         } else {
             db.collection("family_invites").doc(inviteId).update({ status: 'rejected' }).then(() => {
-                alert('초대를 거부했습니다.');
+                alert('요청을 거부했습니다.');
             });
         }
-    }
-
-    window.setSharedFamilyMode = function() {
-        const safeEmailId = auth.currentUser.email.toLowerCase().replace(/[^a-z0-9]/g, '_');
-        currentTargetDocId = `user_${safeEmailId}`;
-        localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
-        alert('내 개인 고유 가계부 모드로 전환되었습니다.');
-        closeFamilyModal();
-        fetchCloudData();
     }
 
     window.updatePasswordAction = function() {
@@ -816,7 +909,8 @@
     });
 
     function fetchCloudData() {
-        let displayTarget = currentTargetDocId.includes('user_') ? '개인 가계부' : '공유 가계부';
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        let displayTarget = currentTargetDocId === myPersonalDocId ? '개인 가계부' : '공유 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
