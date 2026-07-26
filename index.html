@@ -7,6 +7,11 @@
     <!-- 엑셀 파일(.xlsx) 파싱을 위한 SheetJS 라이브러리 추가 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+    <!-- Firebase SDK (Compat 버전 사용으로 전역 바인딩 보장) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --bg-color: #f4f6f9;
@@ -472,12 +477,8 @@
     </div>
 </div>
 
-<!-- Firebase 모듈 스크립트 설정 -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
-    import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-
+<!-- 일반 스크립트 기반 실행 (전역 함수 보장) -->
+<script>
     const firebaseConfig = {
         apiKey: "AIzaSyDWFPrJKmGvuL8qfPuKO6P23eaOJ8Eszbc",
         authDomain: "nam-budget.firebaseapp.com",
@@ -488,9 +489,9 @@
         measurementId: "G-V48XNP7DPH"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
 
     let allCloudData = {};
     let currentEditingTarget = '';
@@ -506,7 +507,6 @@
         }
         setupDragAndDrop();
 
-        // 30초 주기의 백그라운드 자동저장
         setInterval(() => {
             if (isDataDirty && auth.currentUser) {
                 saveCloudDataSilently();
@@ -535,18 +535,18 @@
         const email = document.getElementById('loginEmail').value;
         const pw = document.getElementById('loginPassword').value;
         const rememberLogin = document.getElementById('rememberLoginCheck').checked;
-        const persistenceType = rememberLogin ? browserLocalPersistence : browserSessionPersistence;
+        const persistenceType = rememberLogin ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION;
 
-        setPersistence(auth, persistenceType).then(() => {
-            return signInWithEmailAndPassword(auth, email, pw);
+        auth.setPersistence(persistenceType).then(() => {
+            return auth.signInWithEmailAndPassword(email, pw);
         }).catch(err => {
             alert('로그인 실패: ' + err.message);
         });
     }
 
     window.handleGoogleLogin = function() {
-        const provider = new GoogleAuthProvider();
-        signInWithPopup(auth, provider).catch(err => {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        auth.signInWithPopup(provider).catch(err => {
             alert('구글 로그인 실패: ' + err.message);
         });
     }
@@ -554,7 +554,7 @@
     window.handleSignup = function() {
         const email = document.getElementById('loginEmail').value;
         const pw = document.getElementById('loginPassword').value;
-        createUserWithEmailAndPassword(auth, email, pw).then(() => {
+        auth.createUserWithEmailAndPassword(email, pw).then(() => {
             alert('계정이 생성되었습니다!');
         }).catch(err => alert('회원가입 실패: ' + err.message));
     }
@@ -565,7 +565,7 @@
             alert('먼저 상단 아이디(이메일) 칸에 가입하신 이메일을 입력해 주세요.');
             return;
         }
-        sendPasswordResetEmail(auth, email).then(() => {
+        auth.sendPasswordResetEmail(email).then(() => {
             alert('비밀번호 재설정 메일이 전송되었습니다! 이메일을 확인해 주세요.');
         }).catch(err => alert('전송 실패: ' + err.message));
     }
@@ -632,9 +632,9 @@
 
         const user = auth.currentUser;
         if (user && user.email) {
-            const credential = EmailAuthProvider.credential(user.email, curPw);
-            reauthenticateWithCredential(user, credential).then(() => {
-                updatePassword(user, newPw).then(() => {
+            const credential = firebase.auth.EmailAuthProvider.credential(user.email, curPw);
+            user.reauthenticateWithCredential(credential).then(() => {
+                user.updatePassword(newPw).then(() => {
                     alert('비밀번호가 성공적으로 변경되었습니다!');
                     closePasswordModal();
                 }).catch(err => alert('변경 실패: ' + err.message));
@@ -645,10 +645,10 @@
     }
 
     window.handleLogout = function() {
-        signOut(auth);
+        auth.signOut();
     }
 
-    onAuthStateChanged(auth, user => {
+    auth.onAuthStateChanged(user => {
         if (user) {
             currentUserEmail = user.email || (user.providerData[0] && user.providerData[0].email) || user.uid;
             document.getElementById('loginScreen').style.display = 'none';
@@ -673,9 +673,8 @@
         let displayTarget = isShared ? '공용 가계부' : currentTargetDocId.replace('family_', '').replace(/_/g, '@');
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
-        const docRef = doc(db, "family_budget", currentTargetDocId);
-        onSnapshot(docRef, docSnap => {
-            if (docSnap.exists()) {
+        db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
+            if (docSnap.exists) {
                 allCloudData = docSnap.data();
             } else {
                 allCloudData = {};
@@ -693,10 +692,8 @@
         }
     }
 
-    // [서버 저장] 버튼 클릭 시 명시적 성공/오류 메시지 출력
     window.manualSaveCloudData = function() {
-        const docRef = doc(db, "family_budget", currentTargetDocId);
-        setDoc(docRef, allCloudData).then(() => {
+        db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
             isDataDirty = false;
             document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
             alert('저장되었습니다.');
@@ -708,8 +705,7 @@
     function saveCloudData() {
         isDataDirty = true;
         document.getElementById('autoSaveStatus').innerText = '(변경사항 있음)';
-        const docRef = doc(db, "family_budget", currentTargetDocId);
-        setDoc(docRef, allCloudData).then(() => {
+        db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
             isDataDirty = false;
             document.getElementById('autoSaveStatus').innerText = '(자동저장됨)';
         }).catch(err => {
@@ -718,8 +714,7 @@
     }
 
     function saveCloudDataSilently() {
-        const docRef = doc(db, "family_budget", currentTargetDocId);
-        setDoc(docRef, allCloudData).then(() => {
+        db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
             isDataDirty = false;
             document.getElementById('autoSaveStatus').innerText = '(자동저장 완료)';
         }).catch(err => {
