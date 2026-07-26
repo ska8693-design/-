@@ -496,7 +496,7 @@
     let currentEditingTarget = '';
     let currentTargetDocId = 'shared_data';
     let currentUserEmail = '';
-    let isDataDirty = false; // 변경사항 발생 여부 체크
+    let isDataDirty = false;
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -506,7 +506,7 @@
         }
         setupDragAndDrop();
 
-        // 30초 주기의 자동저장 인터벌 실행
+        // 30초 주기의 백그라운드 자동저장
         setInterval(() => {
             if (isDataDirty && auth.currentUser) {
                 saveCloudDataSilently();
@@ -693,21 +693,21 @@
         }
     }
 
-    // 명시적 서버 저장 버튼 클릭 시
+    // [서버 저장] 버튼 클릭 시 명시적 성공/오류 메시지 출력
     window.manualSaveCloudData = function() {
         const docRef = doc(db, "family_budget", currentTargetDocId);
         setDoc(docRef, allCloudData).then(() => {
             isDataDirty = false;
             document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
-            alert('서버에 성공적으로 저장되었습니다!');
+            alert('저장되었습니다.');
         }).catch(err => {
-            alert('서버 저장 실패: ' + err.message);
+            alert('저장에 실패했습니다. 오류 메시지: ' + err.message);
         });
     }
 
     function saveCloudData() {
         isDataDirty = true;
-        document.getElementById('autoSaveStatus').innerText = '(변경사항 있음 - 저장 필요)';
+        document.getElementById('autoSaveStatus').innerText = '(변경사항 있음)';
         const docRef = doc(db, "family_budget", currentTargetDocId);
         setDoc(docRef, allCloudData).then(() => {
             isDataDirty = false;
@@ -721,7 +721,7 @@
         const docRef = doc(db, "family_budget", currentTargetDocId);
         setDoc(docRef, allCloudData).then(() => {
             isDataDirty = false;
-            document.getElementById('autoSaveStatus').innerText = '(30초 주기 자동저장 완료)';
+            document.getElementById('autoSaveStatus').innerText = '(자동저장 완료)';
         }).catch(err => {
             console.error("자동저장 실패: ", err);
         });
@@ -884,7 +884,6 @@
         if (files.length > 0) processExcelFile(files[0]);
     }
 
-    // 엑셀 파서
     function processExcelFile(file) {
         document.getElementById('selectedFileName').innerText = `선택된 파일: ${file.name}`;
         const reader = new FileReader();
@@ -1010,7 +1009,6 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // AI 스마트 한줄 입력 기능
     window.processAiSmartInput = function() {
         const text = document.getElementById('aiSmartText').value.trim();
         if (!text) return alert('입력 내용을 적어주세요.');
@@ -1052,7 +1050,6 @@
         document.getElementById('aiSmartText').value = '';
     }
 
-    // 항목별 개별 지난달 내역 불러오기 기능
     window.importSectionData = function(sectionKey) {
         const curKey = getMonthKey();
         const [y, m] = curKey.split('-').map(Number);
