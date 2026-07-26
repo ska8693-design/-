@@ -143,12 +143,14 @@
         </h1>
         <div class="header-right" style="font-size: 0.85rem; align-items: center;">
             <span id="currentConnectedInfo" style="background: rgba(255,255,255,0.15); padding: 4px 8px; border-radius: 4px; font-weight: 500;">연동 중...</span>
+            <span id="autoSaveStatus" style="font-size: 0.75rem; color: #cbd5e1;">(자동저장 대기중)</span>
             <div class="month-selector">
                 <input type="month" id="currentMonth" value="2026-03" onchange="loadMonthData()">
             </div>
             <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 업로드</button>
             <button class="btn btn-green" onclick="openFamilyModal()">👥 가족 연동</button>
-            <button class="btn btn-green" onclick="exportToCSV()">저장</button>
+            <button class="btn btn-green" onclick="manualSaveCloudData()">서버 저장</button>
+            <button class="btn btn-sub" onclick="exportToCSV()">엑셀 내보내기</button>
             <button class="btn btn-warn" onclick="openPasswordModal()">암호변경</button>
             <button class="btn btn-danger" onclick="handleLogout()">로그아웃</button>
         </div>
@@ -494,6 +496,7 @@
     let currentEditingTarget = '';
     let currentTargetDocId = 'shared_data';
     let currentUserEmail = '';
+    let isDataDirty = false; // 변경사항 발생 여부 체크
 
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
@@ -502,6 +505,13 @@
             document.getElementById('rememberEmailCheck').checked = true;
         }
         setupDragAndDrop();
+
+        // 30초 주기의 자동저장 인터벌 실행
+        setInterval(() => {
+            if (isDataDirty && auth.currentUser) {
+                saveCloudDataSilently();
+            }
+        }, 30000);
     }
 
     window.toggleRememberEmail = function() {
@@ -683,10 +693,37 @@
         }
     }
 
-    function saveCloudData() {
+    // 명시적 서버 저장 버튼 클릭 시
+    window.manualSaveCloudData = function() {
         const docRef = doc(db, "family_budget", currentTargetDocId);
-        setDoc(docRef, allCloudData).catch(err => {
+        setDoc(docRef, allCloudData).then(() => {
+            isDataDirty = false;
+            document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
+            alert('서버에 성공적으로 저장되었습니다!');
+        }).catch(err => {
+            alert('서버 저장 실패: ' + err.message);
+        });
+    }
+
+    function saveCloudData() {
+        isDataDirty = true;
+        document.getElementById('autoSaveStatus').innerText = '(변경사항 있음 - 저장 필요)';
+        const docRef = doc(db, "family_budget", currentTargetDocId);
+        setDoc(docRef, allCloudData).then(() => {
+            isDataDirty = false;
+            document.getElementById('autoSaveStatus').innerText = '(자동저장됨)';
+        }).catch(err => {
             console.error("저장 실패: ", err);
+        });
+    }
+
+    function saveCloudDataSilently() {
+        const docRef = doc(db, "family_budget", currentTargetDocId);
+        setDoc(docRef, allCloudData).then(() => {
+            isDataDirty = false;
+            document.getElementById('autoSaveStatus').innerText = '(30초 주기 자동저장 완료)';
+        }).catch(err => {
+            console.error("자동저장 실패: ", err);
         });
     }
 
@@ -1365,7 +1402,6 @@
                     <td class="amount">${fmt(balance)}</td>
                 </tr>`;
 
-            // 키워드 검색 통계 처리
             if (searchKeyword !== '') {
                 let monthKeywordSum = 0;
                 let matchedItemsDesc = [];
