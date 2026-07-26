@@ -33,7 +33,7 @@
         .login-options label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
         #loginScreen button { width: 100%; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-bottom: 8px; }
         #loginScreen button:hover { opacity: 0.9; }
-        .google-btn { background: #white !important; color: #333 !important; border: 1px solid var(--border) !important; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; }
+        .google-btn { background: #ffffff !important; color: #333 !important; border: 1px solid var(--border) !important; display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 600; }
         .login-links { margin-top: 10px; font-size: 0.85rem; }
         .login-links span { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
@@ -104,7 +104,6 @@
         .modal-box { background: white; border-radius: 12px; padding: 20px; width: 90%; max-width: 550px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 10px; font-weight: bold; }
         
-        /* 파일 드래그 앤 드롭 업로드 박스 스타일 */
         .drop-zone { border: 2px dashed #cbd5e1; border-radius: 8px; padding: 25px; text-align: center; background: #f8fafc; cursor: pointer; transition: 0.2s; margin-bottom: 15px; }
         .drop-zone:hover, .drop-zone.dragover { background: #eff6ff; border-color: var(--accent); }
         .drop-zone p { font-size: 0.9rem; color: var(--text-muted); margin-top: 5px; }
@@ -140,12 +139,27 @@
             <div class="month-selector">
                 <input type="month" id="currentMonth" value="2026-03" onchange="loadMonthData()">
             </div>
-            <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 파일 업로드 & AI 분류</button>
+            <button class="btn btn-purple" onclick="openAiModal()">📁 엑셀 파일 업로드</button>
             <button class="btn btn-green" onclick="exportToCSV()">엑셀 저장</button>
             <button class="btn btn-warn" onclick="openPasswordModal()">비밀번호 변경</button>
+            <button class="btn btn-purple" onclick="openAccountLinkModal()" style="background:#0284c7;">🔗 계정 연동</button>
             <button class="btn btn-danger" onclick="handleLogout()">로그아웃</button>
         </div>
     </header>
+
+    <!-- AI 한 줄 입력기 섹션 (메인 화면 상단 배치) -->
+    <div class="section-box" style="background: linear-gradient(135deg, #eff6ff 0%, #f1f5f9 100%); border: 2px solid #bfdbfe;">
+        <div class="section-header" style="margin-bottom: 8px; border-bottom: none;">
+            <span class="section-title" style="color: #1e40af;">✨ AI 스마트 한 줄 입력기</span>
+        </div>
+        <div style="font-size: 0.85rem; color: #3b82f6; margin-bottom: 10px;">
+            내역과 금액을 자유롭게 적어보세요 (예: <i>"정훈 월급 350만원"</i>, <i>"식비 이마트 장보기 54000"</i>, <i>"통신비 85000"</i>). 엔터키를 치면 AI가 자동으로 분류하여 등록됩니다!
+        </div>
+        <div class="form-row" style="margin-bottom: 0;">
+            <input type="text" id="aiQuickInput" placeholder="예: 스타벅스 커피 5500" style="flex: 1; padding: 12px; font-size: 1rem; border: 2px solid #93c5fd; border-radius: 8px;" onkeydown="handleAiInputKeydown(event)">
+            <button class="btn btn-purple" style="padding: 12px 20px; font-size: 0.95rem;" onclick="processAiQuickInput()">AI 자동 등록</button>
+        </div>
+    </div>
 
     <div class="nav-tabs">
         <button class="nav-tab active" onclick="switchTab('main')">가계부 작성 & 당월 현황</button>
@@ -340,19 +354,18 @@
     </div>
 </div>
 
-<!-- AI 엑셀 파일 업로드 & 자동 분류 모달 -->
+<!-- AI 엑셀 파일 업로드 모달 -->
 <div class="modal-overlay" id="aiModal">
     <div class="modal-box">
         <div class="modal-header">
-            <span>📁 엑셀 파일 업로드 & AI 자동 분류</span>
+            <span>📁 엑셀 파일 업로드 & 자동 분류</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeAiModal()">&times;</span>
         </div>
         <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
             기존에 정리된 엑셀 파일(`.xlsx`, `.csv`)을 드래그해서 넣거나 클릭해서 선택하세요!<br>
-            AI가 내용을 분석하여 <b>월별</b> 및 <b>항목별</b>로 자동 분류합니다.
+            AI가 내용을 분석하여 월별 및 항목별로 자동 분류합니다.
         </div>
         
-        <!-- 드래그 앤 드롭 업로드 영역 -->
         <div class="drop-zone" id="dropZone" onclick="document.getElementById('excelFileInput').click()">
             <svg width="40" height="40" fill="none" stroke="#2563eb" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
             <p style="font-weight: bold; color: var(--primary); margin-top: 6px;">여기를 클릭하거나 엑셀 파일을 드래그하여 놓으세요</p>
@@ -364,6 +377,34 @@
 
         <div style="text-align:right;">
             <button class="btn btn-danger" onclick="closeAiModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 계정 연동 관리 모달 -->
+<div class="modal-overlay" id="accountLinkModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span>🔗 계정 연동 관리</span>
+            <span style="cursor:pointer; font-size:1.2rem;" onclick="closeAccountLinkModal()">&times;</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 15px;">
+            현재 접속 중인 계정에 다른 로그인 방식(구글 또는 이메일)을 추가로 연결하여, 어떤 방식으로 로그인해도 동일한 가계부 데이터를 공유할 수 있습니다.
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+            <button class="btn google-btn" onclick="linkGoogleAccount()" style="width: 100%; padding: 12px;">
+                <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84c-.21 1.12-.85 2.08-1.81 2.72v2.26h2.92c1.71-1.57 2.69-3.88 2.69-6.63z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.71H.95v2.33C2.43 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.96 10.71c-.18-.54-.28-1.12-.28-1.71s.1-1.17.28-1.71V4.96H.95C.35 6.15 0 7.52 0 9s.35 2.85.95 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.43 2.02.95 4.96l3.01 2.33c.71-2.13 2.7-3.71 5.04-3.71z"/></svg>
+                구글 아이디와 연동하기
+            </button>
+            <div style="background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                <div style="font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; color: var(--primary);">✉️ 기존 이메일/비밀번호 계정 연동하기</div>
+                <input type="email" id="linkEmailInput" placeholder="연동할 이메일 주소" style="width: 100%; padding: 8px; margin-bottom: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem;">
+                <input type="password" id="linkPasswordInput" placeholder="연동할 비밀번호 (6자리 이상)" style="width: 100%; padding: 8px; margin-bottom: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem;">
+                <button class="btn" style="width: 100%;" onclick="linkEmailAccountAction()">이메일 계정 연동 실행</button>
+            </div>
+        </div>
+        <div style="text-align:right;">
+            <button class="btn btn-danger" onclick="closeAccountLinkModal()">닫기</button>
         </div>
     </div>
 </div>
@@ -390,7 +431,7 @@
 <!-- Firebase 모듈 스크립트 설정 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut, sendPasswordResetEmail, updatePassword, EmailAuthProvider, reauthenticateWithCredential, setPersistence, browserLocalPersistence, browserSessionPersistence, linkWithPopup, linkWithCredential } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
     import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -473,6 +514,60 @@
         sendPasswordResetEmail(auth, email).then(() => {
             alert('비밀번호 재설정 메일이 전송되었습니다! 이메일을 확인해 주세요.');
         }).catch(err => alert('전송 실패: ' + err.message));
+    }
+
+    window.openAccountLinkModal = function() {
+        document.getElementById('linkEmailInput').value = '';
+        document.getElementById('linkPasswordInput').value = '';
+        document.getElementById('accountLinkModal').classList.add('active');
+    }
+
+    window.closeAccountLinkModal = function() {
+        document.getElementById('accountLinkModal').classList.remove('active');
+    }
+
+    window.linkGoogleAccount = async function() {
+        const user = auth.currentUser;
+        if (!user) {
+            alert('로그인된 사용자 정보가 없습니다.');
+            return;
+        }
+        const provider = new GoogleAuthProvider();
+        try {
+            await linkWithPopup(user, provider);
+            alert('구글 계정이 성공적으로 연동되었습니다!');
+            closeAccountLinkModal();
+        } catch (err) {
+            alert('구글 계정 연동 실패: ' + err.message);
+        }
+    }
+
+    window.linkEmailAccountAction = async function() {
+        const user = auth.currentUser;
+        if (!user) {
+            alert('로그인된 사용자 정보가 없습니다.');
+            return;
+        }
+        const email = document.getElementById('linkEmailInput').value.trim();
+        const pw = document.getElementById('linkPasswordInput').value;
+
+        if (!email || !pw) {
+            alert('이메일과 비밀번호를 모두 입력해주세요.');
+            return;
+        }
+        if (pw.length < 6) {
+            alert('비밀번호는 6자리 이상이어야 합니다.');
+            return;
+        }
+
+        const credential = EmailAuthProvider.credential(email, pw);
+        try {
+            await linkWithCredential(user, credential);
+            alert('이메일/비밀번호 계정이 성공적으로 연동되었습니다!');
+            closeAccountLinkModal();
+        } catch (err) {
+            alert('이메일 연동 실패: ' + err.message);
+        }
     }
 
     window.openPasswordModal = function() {
@@ -687,7 +782,67 @@
         document.getElementById('aiModal').classList.remove('active');
     }
 
-    // 파일 드래그 앤 드롭 설정
+    // AI 한 줄 입력기 처리 함수
+    window.handleAiInputKeydown = function(e) {
+        if (e.key === 'Enter') {
+            processAiQuickInput();
+        }
+    }
+
+    window.processAiQuickInput = function() {
+        const inputElem = document.getElementById('aiQuickInput');
+        const text = inputElem.value.trim();
+        if (!text) return;
+
+        const numbers = text.match(/[\d,]+/g);
+        if (!numbers || numbers.length === 0) {
+            alert('금액을 인식할 수 없습니다. 금액을 포함하여 입력해주세요.');
+            return;
+        }
+
+        const amount = parseAmount(numbers[numbers.length - 1]);
+        if (amount <= 0) {
+            alert('금액이 올바르지 않습니다.');
+            return;
+        }
+
+        let textPart = text.replace(numbers[numbers.length - 1], '').trim();
+        const curKey = getMonthKey();
+        const monthData = getStoredDataForMonth(curKey);
+
+        // AI 자동 분류 로직
+        if (textPart.includes('월급') || textPart.includes('수입') || textPart.includes('급여') || textPart.includes('용돈')) {
+            let name = '공통';
+            if (textPart.includes('정훈')) name = '남정훈';
+            if (textPart.includes('정화') || textPart.includes('임정화')) name = '임정화';
+            monthData.incomes.push({ id: Date.now(), name, desc: textPart || '수입', amount });
+            alert(`[수입 등록 완료] ${name} / ${textPart} / ${fmt(amount)}`);
+        } else if (textPart.includes('대출') || textPart.includes('보험') || textPart.includes('계모임') || textPart.includes('구독')) {
+            const fixedCats = getCategories('fixed');
+            let cat = fixedCats[0];
+            fixedCats.forEach(c => { if (textPart.includes(c)) cat = c; });
+            monthData.fixedExpenses.push({ id: Date.now(), cat, desc: textPart || '고정지출', amount });
+            alert(`[고정지출 등록 완료] ${cat} / ${textPart} / ${fmt(amount)}`);
+        } else if (textPart.includes('통신') || textPart.includes('관리비') || textPart.includes('가스') || textPart.includes('주유')) {
+            const flexCats = getCategories('flex');
+            let cat = flexCats[0];
+            flexCats.forEach(c => { if (textPart.includes(c)) cat = c; });
+            monthData.flexExpenses.push({ id: Date.now(), cat, desc: textPart || '변동고정비', amount });
+            alert(`[변동고정비 등록 완료] ${cat} / ${textPart} / ${fmt(amount)}`);
+        } else {
+            const varCats = getCategories('variable');
+            let cat = varCats[0];
+            varCats.forEach(c => { if (textPart.includes(c)) cat = c; });
+            const todayStr = `${curKey}-01`;
+            monthData.variableExpenses.push({ id: Date.now(), date: todayStr, cat, desc: textPart || '생활비지출', amount });
+            alert(`[생활비 등록 완료] ${cat} / ${textPart} / ${fmt(amount)}`);
+        }
+
+        saveCloudData();
+        render();
+        inputElem.value = '';
+    }
+
     function setupDragAndDrop() {
         const dropZone = document.getElementById('dropZone');
         if (!dropZone) return;
@@ -710,7 +865,6 @@
         if (files.length > 0) processExcelFile(files[0]);
     }
 
-    // 엑셀 파일 읽기 및 AI 자동 분류 파싱
     function processExcelFile(file) {
         document.getElementById('selectedFileName').innerText = `선택된 파일: ${file.name}`;
         const reader = new FileReader();
@@ -730,7 +884,6 @@
                     const rowText = row.join(' ');
                     if (!rowText.trim()) return;
 
-                    // 1. 월(Date) 추출
                     let targetMonthKey = currentSelectedMonth;
                     const dateMatch = rowText.match(/(\d{4})[-./](\d{1,2})/);
                     if (dateMatch) {
@@ -745,7 +898,6 @@
 
                     const monthData = getStoredDataForMonth(targetMonthKey);
 
-                    // 2. 금액 추출
                     const numbers = rowText.match(/[\d,]+/g);
                     if (!numbers || numbers.length === 0) return;
                     const amount = parseAmount(numbers[numbers.length - 1]);
@@ -753,7 +905,6 @@
 
                     let textPart = rowText.replace(numbers[numbers.length - 1], '').trim();
 
-                    // 3. 항목별 자동 분류
                     if (textPart.includes('월급') || textPart.includes('수입') || textPart.includes('급여') || textPart.includes('용돈')) {
                         let name = '공통';
                         if (textPart.includes('정훈')) name = '남정훈';
