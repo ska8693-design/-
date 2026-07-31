@@ -151,7 +151,7 @@
     </div>
 </div>
 
-<!-- 회원가입 팝업 모달 (복원) -->
+<!-- 회원가입 팝업 모달 -->
 <div class="modal-overlay" id="signupModal">
     <div class="modal-box" style="max-width: 440px;">
         <div class="modal-header">
@@ -374,7 +374,7 @@
     </div>
 </div>
 
-<!-- 대분류 관리 모달 -->
+<!-- 내역 항목(대분류) 관리 모달 -->
 <div class="modal-overlay" id="sectionManagerModal">
     <div class="modal-box" style="max-width: 600px;">
         <div class="modal-header">
@@ -604,7 +604,7 @@
         });
     }
 
-    /* 회원가입 모달 제어 및 중복확인 기능 (복원) */
+    /* 회원가입 모달 제어 및 중복확인 기능 복원 */
     window.openSignupModal = function() {
         document.getElementById('signupEmail').value = '';
         document.getElementById('signupPassword').value = '';
@@ -1349,16 +1349,16 @@
         saveData(data);
     }
 
-    /* 생활비 입력란 (기존 방식 유지) */
+    /* 생활비 입력란 (날짜 선택 기능 재반영) */
     window.addCustomVariable = function(secId, catKey) {
-        const curKey = getMonthKey();
-        const date = `${curKey}-01`;
+        const dateInput = document.getElementById(`varDate_${secId}`);
+        const date = dateInput ? dateInput.value : `${getMonthKey()}-01`;
         const cat = document.getElementById(`catSelect_${secId}`).value;
         const desc = document.getElementById(`desc_${secId}`).value;
         const amount = parseAmount(document.getElementById(`amount_${secId}`).value);
         const note = document.getElementById(`note_${secId}`).value.trim();
         if (!desc || !amount) return alert('내역과 금액을 입력해주세요.');
-        const data = getStoredData(curKey);
+        const data = getStoredData(getMonthKey());
         data[secId].push({ id: Date.now(), date, cat, desc, amount, note });
         saveData(data);
     }
@@ -1384,7 +1384,7 @@
         }
     }
 
-    /* 행 단위 통합 수정 모달 로직 (생활비 포함 모든 항목 수정 시 날짜까지 한 번에 수정 가능) */
+    /* 행 단위 통합 수정 모달 로직 (날짜, 분류, 내역, 금액, 비고 한 번에 수정 가능) */
     window.openRowEditModal = function(secId, itemId) {
         const data = getStoredData(getMonthKey());
         const item = (data[secId] || []).find(x => x.id === itemId);
@@ -1743,6 +1743,7 @@
                             </div>
                         </div>
                         <div class="form-row">
+                            <input type="date" id="varDate_${sec.id}">
                             <select id="catSelect_${sec.id}" onchange="checkCategoryOption('variable', this)"></select>
                             <input type="text" id="desc_${sec.id}" placeholder="내역" style="flex:1;">
                             <input type="text" id="amount_${sec.id}" placeholder="금액" style="flex:0.8;" oninput="formatInputComma(this)">
@@ -1813,6 +1814,10 @@
                 renderSelectOptions(catKey, `catSelect_${sec.id}`);
             } else if (sec.type === 'variable') {
                 renderSelectOptions('variable', `catSelect_${sec.id}`);
+                let varDateElem = document.getElementById(`varDate_${sec.id}`);
+                if (varDateElem && !varDateElem.value) {
+                    varDateElem.value = `${curKey}-01`;
+                }
             } else if (sec.type === 'asset') {
                 renderSelectOptions('asset', `assetType_${sec.id}`);
             }
