@@ -47,7 +47,7 @@
         .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .month-selector input { padding: 8px 14px; border-radius: 6px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; }
 
-        /* 헤더 우측 버튼 패딩 및 규격 일괄 통일 */
+        /* 헤더 우측 버튼 규격 일괄 통일 */
         .header-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
 
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
@@ -148,13 +148,17 @@
 
 <!-- 회원가입 팝업 모달 -->
 <div class="modal-overlay" id="signupModal">
-    <div class="modal-box" style="max-width: 400px;">
+    <div class="modal-box" style="max-width: 440px;">
         <div class="modal-header">
             <span>📝 새 계정 만들기</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeSignupModal()">&times;</span>
         </div>
         <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
-            <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+            <div style="display:flex; gap:6px;">
+                <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:6px;" oninput="onSignupEmailInput()">
+                <button class="btn btn-purple" style="padding: 0 12px; font-size: 0.85rem;" onclick="checkEmailDuplicate()">중복확인</button>
+            </div>
+            <div id="emailCheckStatus" style="font-size:0.78rem; margin-top:-4px; margin-bottom:2px; display:none;"></div>
             <input type="password" id="signupPassword" placeholder="비밀번호 (6자리 이상)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
             <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
         </div>
@@ -409,10 +413,10 @@
         
         <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
             <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
-            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
+            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">공용 가계부 접속 중</div>
             <div style="display:flex; gap:8px;">
                 <button class="btn" style="flex:1; background:#475569; padding:6px;" onclick="switchToMyPersonalBudget()">내 개인 가계부 보기</button>
-                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px; display:none;" onclick="switchToLinkedBudget()">연동된 공유 가계부 보기</button>
+                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px;" onclick="switchToLinkedBudget()">공용 가계부 보기</button>
                 <button class="btn btn-danger" id="unlinkBtn" style="padding:6px; display:none;" onclick="unlinkFamilyAccount()">연동 해제</button>
             </div>
         </div>
@@ -482,7 +486,7 @@
     const db = firebase.firestore();
 
     let allCloudData = {};
-    let currentTargetDocId = '';
+    let currentTargetDocId = 'shared_data'; // 기본 접속 경로를 shared_data로 고정
     let currentUserEmail = '';
     let isDataDirty = false;
     let inviteUnsubscribe = null;
@@ -490,6 +494,8 @@
     let hasAlertedInvite = false;
     let currentEditingTarget = 'fixed';
     
+    let isEmailChecked = false;
+    let verifiedEmail = '';
     let sectionSortModes = {};
 
     window.onload = function() {
@@ -559,16 +565,64 @@
         });
     }
 
-    /* 회원가입 모달 제어 및 실행 */
+    /* 회원가입 모달 제어 및 중복확인 기능 */
     window.openSignupModal = function() {
         document.getElementById('signupEmail').value = '';
         document.getElementById('signupPassword').value = '';
         document.getElementById('signupPasswordConfirm').value = '';
+        const statusEl = document.getElementById('emailCheckStatus');
+        statusEl.style.display = 'none';
+        statusEl.innerText = '';
+        isEmailChecked = false;
+        verifiedEmail = '';
         document.getElementById('signupModal').classList.add('active');
     }
 
     window.closeSignupModal = function() {
         document.getElementById('signupModal').classList.remove('active');
+    }
+
+    window.onSignupEmailInput = function() {
+        isEmailChecked = false;
+        verifiedEmail = '';
+        const statusEl = document.getElementById('emailCheckStatus');
+        statusEl.style.display = 'none';
+        statusEl.innerText = '';
+    }
+
+    window.checkEmailDuplicate = function() {
+        const email = document.getElementById('signupEmail').value.trim();
+        const statusEl = document.getElementById('emailCheckStatus');
+
+        if (!email) {
+            alert('중복확인할 이메일 주소를 입력해주세요.');
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert('올바른 이메일 형식이 아닙니다.');
+            return;
+        }
+
+        auth.fetchSignInMethodsForEmail(email).then(methods => {
+            statusEl.style.display = 'block';
+            if (methods && methods.length > 0) {
+                isEmailChecked = false;
+                verifiedEmail = '';
+                statusEl.style.color = 'var(--danger)';
+                statusEl.innerText = '❌ 이미 가입된 아이디(이메일)입니다.';
+                alert('이미 사용 중인 이메일 주소입니다.');
+            } else {
+                isEmailChecked = true;
+                verifiedEmail = email;
+                statusEl.style.color = 'var(--success)';
+                statusEl.innerText = '✅ 사용 가능한 아이디(이메일)입니다.';
+                alert('사용 가능한 이메일 주소입니다.');
+            }
+        }).catch(err => {
+            alert('중복 확인 중 오류가 발생했습니다: ' + err.message);
+        });
     }
 
     window.executeSignup = function() {
@@ -580,6 +634,12 @@
             alert('모든 가입 정보를 입력해주세요.');
             return;
         }
+
+        if (!isEmailChecked || verifiedEmail !== email) {
+            alert('먼저 이메일 중복확인을 완료해주세요.');
+            return;
+        }
+
         if (pw.length < 6) {
             alert('비밀번호는 최소 6자리 이상이어야 합니다.');
             return;
@@ -641,19 +701,22 @@
         const uid = auth.currentUser.uid;
         const linkedKey = `linked_family_${uid}`;
         const linkedDocId = localStorage.getItem(linkedKey);
-        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
         const statusText = document.getElementById('currentModeStatusText');
         const switchLinkedBtn = document.getElementById('switchToLinkedBtn');
         const unlinkBtn = document.getElementById('unlinkBtn');
 
-        if (linkedDocId && linkedDocId !== myPersonalDocId) {
-            statusText.innerText = `현재 연동된 공유 가계부 (${linkedDocId}) 보는 중`;
+        if (currentTargetDocId === 'shared_data') {
+            statusText.innerText = '현재 공용 가계부 (기존 작성 데이터) 보는 중';
+        } else {
+            statusText.innerText = `현재 선택된 경로 (${currentTargetDocId}) 보는 중`;
+        }
+
+        if (linkedDocId && linkedDocId !== 'shared_data') {
             switchLinkedBtn.style.display = 'block';
             unlinkBtn.style.display = 'block';
         } else {
-            statusText.innerText = '현재 내 개인 고유 가계부 보는 중';
-            switchLinkedBtn.style.display = linkedDocId && linkedDocId !== myPersonalDocId ? 'block' : 'none';
+            switchLinkedBtn.style.display = 'block';
             unlinkBtn.style.display = 'none';
         }
     }
@@ -667,22 +730,17 @@
     }
 
     window.switchToLinkedBudget = function() {
-        const uid = auth.currentUser.uid;
-        const linkedDocId = localStorage.getItem(`linked_family_${uid}`);
-        if (linkedDocId) {
-            currentTargetDocId = linkedDocId;
-            closeFamilyModal();
-            fetchCloudData();
-            alert('연동된 공유 가계부로 전환되었습니다.');
-        }
+        currentTargetDocId = 'shared_data';
+        closeFamilyModal();
+        fetchCloudData();
+        alert('공용 가계부(기존 작성 데이터)로 전환되었습니다.');
     }
 
     window.unlinkFamilyAccount = function() {
-        if (confirm('정말 연동을 해제하시겠습니까? 해제 후에는 내 개인 가계부로 전환됩니다.')) {
+        if (confirm('정말 연동을 해제하시겠습니까? 해제 후에는 공용 가계부로 전환됩니다.')) {
             const uid = auth.currentUser.uid;
             localStorage.removeItem(`linked_family_${uid}`);
-            const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-            currentTargetDocId = myPersonalDocId;
+            currentTargetDocId = 'shared_data';
             closeFamilyModal();
             fetchCloudData();
             alert('연동이 해제되었습니다.');
@@ -707,7 +765,7 @@
             type: 'invite_to_my_budget',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: `user_${safeMyEmail}`,
+            targetDocId: 'shared_data',
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -736,7 +794,7 @@
             type: 'request_to_join',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: `user_${targetEmail.replace(/[^a-z0-9]/g, '_')}`,
+            targetDocId: 'shared_data',
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -814,7 +872,7 @@
 
     window.respondInvitation = function(inviteId, targetDocId, isAccepted) {
         if (isAccepted) {
-            currentTargetDocId = targetDocId;
+            currentTargetDocId = targetDocId || 'shared_data';
             localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
             
             db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
@@ -875,8 +933,7 @@
             if (savedLink) {
                 currentTargetDocId = savedLink;
             } else {
-                const safeEmailId = currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
-                currentTargetDocId = `user_${safeEmailId}`;
+                currentTargetDocId = 'shared_data'; // 기본 접속 경로 고정
             }
 
             fetchCloudData();
@@ -892,14 +949,14 @@
     });
 
     function fetchCloudData() {
-        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        let displayTarget = currentTargetDocId === myPersonalDocId ? '개인 가계부' : '공유 가계부';
+        let displayTarget = currentTargetDocId === 'shared_data' ? '공용 가계부' : '개인 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
             if (docSnap.exists) {
                 allCloudData = docSnap.data();
                 
+                // 데이터가 존재하는 최신 월 자동 선택 복원 로직
                 const monthKeys = Object.keys(allCloudData).filter(k => k.match(/^\d{4}-\d{2}$/));
                 if (monthKeys.length > 0) {
                     monthKeys.sort();
