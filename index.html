@@ -47,6 +47,7 @@
         .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .month-selector input { padding: 8px 14px; border-radius: 6px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; }
 
+        /* 헤더 우측 버튼 패딩 및 규격 일괄 통일 */
         .header-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
 
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
@@ -147,17 +148,13 @@
 
 <!-- 회원가입 팝업 모달 -->
 <div class="modal-overlay" id="signupModal">
-    <div class="modal-box" style="max-width: 440px;">
+    <div class="modal-box" style="max-width: 400px;">
         <div class="modal-header">
             <span>📝 새 계정 만들기</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeSignupModal()">&times;</span>
         </div>
         <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
-            <div style="display:flex; gap:6px;">
-                <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:6px;" oninput="onSignupEmailInput()">
-                <button class="btn btn-purple" style="padding: 0 12px; font-size: 0.85rem;" onclick="checkEmailDuplicate()">중복확인</button>
-            </div>
-            <div id="emailCheckStatus" style="font-size:0.78rem; margin-top:-4px; margin-bottom:2px; display:none;"></div>
+            <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
             <input type="password" id="signupPassword" placeholder="비밀번호 (6자리 이상)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
             <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
         </div>
@@ -412,10 +409,10 @@
         
         <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
             <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
-            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">공용 가계부 접속 중</div>
+            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
             <div style="display:flex; gap:8px;">
                 <button class="btn" style="flex:1; background:#475569; padding:6px;" onclick="switchToMyPersonalBudget()">내 개인 가계부 보기</button>
-                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px;" onclick="switchToLinkedBudget()">공용 가계부 보기</button>
+                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px; display:none;" onclick="switchToLinkedBudget()">연동된 공유 가계부 보기</button>
                 <button class="btn btn-danger" id="unlinkBtn" style="padding:6px; display:none;" onclick="unlinkFamilyAccount()">연동 해제</button>
             </div>
         </div>
@@ -485,7 +482,7 @@
     const db = firebase.firestore();
 
     let allCloudData = {};
-    let currentTargetDocId = 'shared_data'; // 기본 접속 경로를 shared_data로 고정
+    let currentTargetDocId = '';
     let currentUserEmail = '';
     let isDataDirty = false;
     let inviteUnsubscribe = null;
@@ -493,8 +490,6 @@
     let hasAlertedInvite = false;
     let currentEditingTarget = 'fixed';
     
-    let isEmailChecked = false;
-    let verifiedEmail = '';
     let sectionSortModes = {};
 
     window.onload = function() {
@@ -503,6 +498,10 @@
             document.getElementById('loginEmail').value = savedEmail;
             document.getElementById('rememberEmailCheck').checked = true;
         }
+
+        const now = new Date();
+        const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        document.getElementById('currentMonth').value = currentYearMonth;
 
         setupDragAndDrop();
 
@@ -560,64 +559,16 @@
         });
     }
 
-    /* 회원가입 모달 제어 및 중복확인 기능 */
+    /* 회원가입 모달 제어 및 실행 */
     window.openSignupModal = function() {
         document.getElementById('signupEmail').value = '';
         document.getElementById('signupPassword').value = '';
         document.getElementById('signupPasswordConfirm').value = '';
-        const statusEl = document.getElementById('emailCheckStatus');
-        statusEl.style.display = 'none';
-        statusEl.innerText = '';
-        isEmailChecked = false;
-        verifiedEmail = '';
         document.getElementById('signupModal').classList.add('active');
     }
 
     window.closeSignupModal = function() {
         document.getElementById('signupModal').classList.remove('active');
-    }
-
-    window.onSignupEmailInput = function() {
-        isEmailChecked = false;
-        verifiedEmail = '';
-        const statusEl = document.getElementById('emailCheckStatus');
-        statusEl.style.display = 'none';
-        statusEl.innerText = '';
-    }
-
-    window.checkEmailDuplicate = function() {
-        const email = document.getElementById('signupEmail').value.trim();
-        const statusEl = document.getElementById('emailCheckStatus');
-
-        if (!email) {
-            alert('중복확인할 이메일 주소를 입력해주세요.');
-            return;
-        }
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            alert('올바른 이메일 형식이 아닙니다.');
-            return;
-        }
-
-        auth.fetchSignInMethodsForEmail(email).then(methods => {
-            statusEl.style.display = 'block';
-            if (methods && methods.length > 0) {
-                isEmailChecked = false;
-                verifiedEmail = '';
-                statusEl.style.color = 'var(--danger)';
-                statusEl.innerText = '❌ 이미 가입된 아이디(이메일)입니다.';
-                alert('이미 사용 중인 이메일 주소입니다.');
-            } else {
-                isEmailChecked = true;
-                verifiedEmail = email;
-                statusEl.style.color = 'var(--success)';
-                statusEl.innerText = '✅ 사용 가능한 아이디(이메일)입니다.';
-                alert('사용 가능한 이메일 주소입니다.');
-            }
-        }).catch(err => {
-            alert('중복 확인 중 오류가 발생했습니다: ' + err.message);
-        });
     }
 
     window.executeSignup = function() {
@@ -629,12 +580,6 @@
             alert('모든 가입 정보를 입력해주세요.');
             return;
         }
-
-        if (!isEmailChecked || verifiedEmail !== email) {
-            alert('먼저 이메일 중복확인을 완료해주세요.');
-            return;
-        }
-
         if (pw.length < 6) {
             alert('비밀번호는 최소 6자리 이상이어야 합니다.');
             return;
@@ -696,22 +641,19 @@
         const uid = auth.currentUser.uid;
         const linkedKey = `linked_family_${uid}`;
         const linkedDocId = localStorage.getItem(linkedKey);
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
 
         const statusText = document.getElementById('currentModeStatusText');
         const switchLinkedBtn = document.getElementById('switchToLinkedBtn');
         const unlinkBtn = document.getElementById('unlinkBtn');
 
-        if (currentTargetDocId === 'shared_data') {
-            statusText.innerText = '현재 공용 가계부 (기존 작성 데이터) 보는 중';
-        } else {
-            statusText.innerText = `현재 선택된 경로 (${currentTargetDocId}) 보는 중`;
-        }
-
-        if (linkedDocId && linkedDocId !== 'shared_data') {
+        if (linkedDocId && linkedDocId !== myPersonalDocId) {
+            statusText.innerText = `현재 연동된 공유 가계부 (${linkedDocId}) 보는 중`;
             switchLinkedBtn.style.display = 'block';
             unlinkBtn.style.display = 'block';
         } else {
-            switchLinkedBtn.style.display = 'block';
+            statusText.innerText = '현재 내 개인 고유 가계부 보는 중';
+            switchLinkedBtn.style.display = linkedDocId && linkedDocId !== myPersonalDocId ? 'block' : 'none';
             unlinkBtn.style.display = 'none';
         }
     }
@@ -725,17 +667,22 @@
     }
 
     window.switchToLinkedBudget = function() {
-        currentTargetDocId = 'shared_data';
-        closeFamilyModal();
-        fetchCloudData();
-        alert('공용 가계부(기존 작성 데이터)로 전환되었습니다.');
+        const uid = auth.currentUser.uid;
+        const linkedDocId = localStorage.getItem(`linked_family_${uid}`);
+        if (linkedDocId) {
+            currentTargetDocId = linkedDocId;
+            closeFamilyModal();
+            fetchCloudData();
+            alert('연동된 공유 가계부로 전환되었습니다.');
+        }
     }
 
     window.unlinkFamilyAccount = function() {
-        if (confirm('정말 연동을 해제하시겠습니까? 해제 후에는 공용 가계부로 전환됩니다.')) {
+        if (confirm('정말 연동을 해제하시겠습니까? 해제 후에는 내 개인 가계부로 전환됩니다.')) {
             const uid = auth.currentUser.uid;
             localStorage.removeItem(`linked_family_${uid}`);
-            currentTargetDocId = 'shared_data';
+            const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            currentTargetDocId = myPersonalDocId;
             closeFamilyModal();
             fetchCloudData();
             alert('연동이 해제되었습니다.');
@@ -760,7 +707,7 @@
             type: 'invite_to_my_budget',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: 'shared_data',
+            targetDocId: `user_${safeMyEmail}`,
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -789,7 +736,7 @@
             type: 'request_to_join',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: 'shared_data',
+            targetDocId: `user_${targetEmail.replace(/[^a-z0-9]/g, '_')}`,
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -867,7 +814,7 @@
 
     window.respondInvitation = function(inviteId, targetDocId, isAccepted) {
         if (isAccepted) {
-            currentTargetDocId = targetDocId || 'shared_data';
+            currentTargetDocId = targetDocId;
             localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
             
             db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
@@ -928,7 +875,8 @@
             if (savedLink) {
                 currentTargetDocId = savedLink;
             } else {
-                currentTargetDocId = 'shared_data'; // 기본 접속 경로 고정
+                const safeEmailId = currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
+                currentTargetDocId = `user_${safeEmailId}`;
             }
 
             fetchCloudData();
@@ -943,37 +891,21 @@
         }
     });
 
-    /* 구 구조와 개편 구조 간 데이터 자동 변환 및 최신 월 선택 복원 로직 */
     function fetchCloudData() {
-        let displayTarget = currentTargetDocId === 'shared_data' ? '공용 가계부' : '개인 가계부';
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        let displayTarget = currentTargetDocId === myPersonalDocId ? '개인 가계부' : '공유 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
             if (docSnap.exists) {
                 allCloudData = docSnap.data();
                 
-                // 1) 전체 문서 내에서 'YYYY-MM' 형식의 월별 키 전부 탐색
                 const monthKeys = Object.keys(allCloudData).filter(k => k.match(/^\d{4}-\d{2}$/));
-                
                 if (monthKeys.length > 0) {
                     monthKeys.sort();
-                    
-                    // 2) 데이터 호환성 보장: 구 데이터 항목을 개편된 필드 명칭으로 자동 보정
-                    monthKeys.forEach(mKey => {
-                        const mObj = allCloudData[mKey];
-                        if (mObj) {
-                            if (!mObj.incomes) mObj.incomes = mObj.income || [];
-                            if (!mObj.fixedExpenses) mObj.fixedExpenses = mObj.fixed || [];
-                            if (!mObj.flexExpenses) mObj.flexExpenses = mObj.flex || [];
-                            if (!mObj.variableExpenses) mObj.variableExpenses = mObj.variable || [];
-                            if (!mObj.assetItems) mObj.assetItems = mObj.asset || [];
-                        }
-                    });
-
-                    // 3) 사용자가 직접 달을 바꾸지 않았다면 실제 데이터가 있는 가장 최신 월을 자동 선택
+                    const latestMonth = monthKeys[monthKeys.length - 1];
                     if (!window.hasUserSelectedMonth) {
-                        const latestMonthWithData = monthKeys[monthKeys.length - 1];
-                        document.getElementById('currentMonth').value = latestMonthWithData;
+                        document.getElementById('currentMonth').value = latestMonth;
                     }
                 }
             } else {
@@ -1210,6 +1142,718 @@
         renderOptions('flex', 'flexCategory');
         renderOptions('variable', 'varCategory');
         renderOptions('asset', 'assetType');
+    }
+
+    window.checkCategoryOption = function(targetType, selectElem) {
+        if (selectElem.value === '__MANAGE__') {
+            openCategoryModal(targetType);
+            selectElem.selectedIndex = 0;
+        }
+    }
+
+    function openCategoryModal(targetType) {
+        currentEditingTarget = targetType;
+        const titles = { fixed: '고정지출 소항목 관리', flex: '변동고정비 소항목 관리', variable: '생활비 소항목 관리', asset: '예적금/주식 소항목 관리' };
+        document.getElementById('modalTitle').innerText = titles[targetType] || '소항목 관리';
+        document.getElementById('categoryModal').classList.add('active');
+        renderModalCatList();
+    }
+
+    window.closeCategoryModal = function() {
+        document.getElementById('categoryModal').classList.remove('active');
+        renderCategorySelects();
+        render();
+    }
+
+    function renderModalCatList() {
+        const cats = getCategories(currentEditingTarget);
+        const ul = document.getElementById('modalCatList');
+        ul.innerHTML = '';
+        cats.forEach((cat, idx) => {
+            ul.innerHTML += `
+                <li>
+                    <span style="font-weight:600;">${cat}</span>
+                    <div style="display:flex; gap:4px; align-items:center;">
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, -1)" ${idx === 0 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▲</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem; background:#475569;" onclick="moveCatOrder(${idx}, 1)" ${idx === cats.length - 1 ? 'disabled style="opacity:0.3; cursor:default;"' : ''}>▼</button>
+                        <button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editModalCat(${idx})">수정</button>
+                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="deleteModalCat(${idx})">삭제</button>
+                    </div>
+                </li>`;
+        });
+    }
+
+    window.moveCatOrder = function(idx, direction) {
+        const cats = getCategories(currentEditingTarget);
+        const targetIdx = idx + direction;
+        if (targetIdx < 0 || targetIdx >= cats.length) return;
+        const temp = cats[idx];
+        cats[idx] = cats[targetIdx];
+        cats[targetIdx] = temp;
+        saveCloudData();
+        renderModalCatList();
+    }
+
+    window.addModalCategory = function() {
+        const input = document.getElementById('modalNewCatName');
+        const name = input.value.trim();
+        if (!name) return alert('항목명을 입력해주세요.');
+        const cats = getCategories(currentEditingTarget);
+        if (!cats.includes(name)) {
+            cats.push(name);
+            saveCloudData();
+            renderModalCatList();
+            input.value = '';
+        } else {
+            alert('이미 존재하는 항목명입니다.');
+        }
+    }
+
+    window.editModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
+        if (newName && newName.trim() !== '') {
+            cats[idx] = newName.trim();
+            saveCloudData();
+            renderModalCatList();
+        }
+    }
+
+    window.deleteModalCat = function(idx) {
+        const cats = getCategories(currentEditingTarget);
+        if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
+            cats.splice(idx, 1);
+            saveCloudData();
+            renderModalCatList();
+        }
+    }
+
+    window.openAiModal = function() {
+        document.getElementById('selectedFileName').innerText = '';
+        document.getElementById('aiModal').classList.add('active');
+    }
+    window.closeAiModal = function() {
+        document.getElementById('aiModal').classList.remove('active');
+    }
+
+    function setupDragAndDrop() {
+        const dropZone = document.getElementById('dropZone');
+        if (!dropZone) return;
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }, false);
+        });
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); }, false);
+        });
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) processExcelFile(files[0]);
+        }, false);
+    }
+
+    window.handleFileSelect = function(event) {
+        const files = event.target.files;
+        if (files.length > 0) processExcelFile(files[0]);
+    }
+
+    function processExcelFile(file) {
+        document.getElementById('selectedFileName').innerText = `선택된 파일: ${file.name}`;
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                let totalAdded = 0;
+
+                workbook.SheetNames.forEach(sheetName => {
+                    let yearMonth = "2026-03";
+                    if (sheetName.includes("3월")) yearMonth = "2026-03";
+                    else if (sheetName.includes("2월")) yearMonth = "2026-02";
+                    else if (sheetName.includes("1월")) yearMonth = "2026-01";
+
+                    const worksheet = workbook.Sheets[sheetName];
+                    const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                    const monthData = getStoredDataForMonth(yearMonth);
+
+                    if (rows[4] && rows[4][0] !== undefined) {
+                        const carryVal = Number(String(rows[4][0]).replace(/,/g, ''));
+                        if (!isNaN(carryVal) && carryVal > 0) {
+                            monthData.isManualCarry = true;
+                            monthData.manualCarryVal = carryVal;
+                        }
+                    }
+
+                    let lastCatText = '';
+
+                    rows.forEach((row, idx) => {
+                        if (idx >= 4) {
+                            const incName = row[2];
+                            const incDesc = row[3];
+                            const incAmt = Number(String(row[4] || '').replace(/,/g, ''));
+                            const incNote = row[5] ? String(row[5]).trim() : '';
+
+                            if (incName && incDesc && !isNaN(incAmt) && incAmt > 0) {
+                                if (!monthData.incomes.some(x => x.desc === incDesc && x.amount === incAmt)) {
+                                    monthData.incomes.push({ id: Date.now() + Math.random(), name: String(incName).trim(), desc: String(incDesc).trim(), amount: incAmt, note: incNote });
+                                    totalAdded++;
+                                }
+                            }
+
+                            const varCat = row[6];
+                            const varDate = row[7];
+                            const varDesc = row[8];
+                            const varAmt = Number(String(row[9] || '').replace(/,/g, ''));
+                            const varNote = row[10] ? String(row[10]).trim() : '';
+
+                            if (varCat !== undefined && varCat !== null && String(varCat).trim() !== '') {
+                                lastCatText = String(varCat).trim();
+                            }
+                            
+                            if (varDesc && !isNaN(varAmt) && varAmt > 0) {
+                                const catText = lastCatText;
+                                const descText = String(varDesc).trim();
+                                const dateStr = `${yearMonth}-01`;
+
+                                if (catText.includes('고정(계)') || descText.includes('계') || descText.includes('상조회비') || descText.includes('경조사') || descText.includes('헤게모니')) {
+                                    if (!monthData.fixedExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.fixedExpenses.push({ id: Date.now() + Math.random(), cat: '계모임/경조사', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else if (catText.includes('고정(보험)') || descText.includes('보험') || descText.includes('현대해상') || descText.includes('손해') || descText.includes('생명') || descText.includes('화재')) {
+                                    if (!monthData.fixedExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.fixedExpenses.push({ id: Date.now() + Math.random(), cat: '보험료', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else if (catText.includes('고정(대출)') || descText.includes('대출') || descText.includes('청약')) {
+                                    if (!monthData.fixedExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.fixedExpenses.push({ id: Date.now() + Math.random(), cat: '대출 상환', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else if (catText.includes('고정(예적금)') || descText.includes('적금')) {
+                                    if (!monthData.fixedExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.fixedExpenses.push({ id: Date.now() + Math.random(), cat: '기타 고정', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else if (catText.includes('고정(교육)') || descText.includes('학원')) {
+                                    if (!monthData.fixedExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.fixedExpenses.push({ id: Date.now() + Math.random(), cat: '기타 고정', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else if (catText.includes('고정(할부)') || catText.includes('고정(기타)') || descText.includes('정수기') || descText.includes('쿠팡')) {
+                                    if (!monthData.fixedExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.fixedExpenses.push({ id: Date.now() + Math.random(), cat: '구독/할부', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else if (catText.includes('변동') || catText.includes('통신') || descText.includes('관리비') || descText.includes('가스') || descText.includes('주유')) {
+                                    if (!monthData.flexExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.flexExpenses.push({ id: Date.now() + Math.random(), cat: '통신비', desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                } else {
+                                    let subCat = '생활비';
+                                    if (descText.includes('식비') || descText.includes('마트')) subCat = '식비/장보기';
+                                    else if (descText.includes('커피') || descText.includes('카페')) subCat = '커피/디저트';
+                                    else if (descText.includes('쇼핑') || descText.includes('생필품')) subCat = '생필품/쇼핑';
+
+                                    if (!monthData.variableExpenses.some(x => x.desc === descText && x.amount === varAmt)) {
+                                        monthData.variableExpenses.push({ id: Date.now() + Math.random(), date: dateStr, cat: subCat, desc: descText, amount: varAmt, note: varNote });
+                                        totalAdded++;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                });
+
+                if (totalAdded > 0) {
+                    saveCloudData();
+                    render();
+                    alert(`엑셀 업로드 성공! 총 ${totalAdded}건의 내역과 비고란이 반영되었습니다.`);
+                    closeAiModal();
+                } else {
+                    alert('엑셀에서 읽어올 데이터를 찾지 못했습니다.');
+                }
+            } catch (err) {
+                alert('파일 읽기 오류: ' + err.message);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    window.processAiSmartInput = function() {
+        const text = document.getElementById('aiSmartText').value.trim();
+        if (!text) return alert('입력 내용을 적어주세요.');
+
+        const numbers = text.match(/[\d,]+/g);
+        if (!numbers || numbers.length === 0) return alert('금액 숫자를 인식할 수 없습니다.');
+        const amount = parseAmount(numbers[numbers.length - 1]);
+        if (amount <= 0) return alert('올바른 금액을 입력해주세요.');
+
+        let textPart = text.replace(numbers[numbers.length - 1], '').trim();
+        const curKey = getMonthKey();
+        const monthData = getStoredDataForMonth(curKey);
+
+        if (textPart.includes('월급') || textPart.includes('수입') || textPart.includes('급여') || textPart.includes('용돈')) {
+            let name = '공통';
+            if (textPart.includes('정훈') || textPart.includes('남정훈')) name = '남정훈';
+            if (textPart.includes('정화') || textPart.includes('임정화')) name = '임정화';
+            monthData.incomes.push({ id: Date.now(), name, desc: textPart || '수입', amount, note: '' });
+            alert(`[AI 자동 분류: 수입] '${name}' 공동 내역 추가 완료! (${fmt(amount)})`);
+        } else if (textPart.includes('대출') || textPart.includes('보험') || textPart.includes('계') || textPart.includes('적금')) {
+            let cat = '기타 고정';
+            if (textPart.includes('대출')) cat = '대출 상환';
+            else if (textPart.includes('보험')) cat = '보험료';
+            else if (textPart.includes('계')) cat = '계모임/경조사';
+            
+            monthData.fixedExpenses.push({ id: Date.now(), cat, desc: textPart, amount, note: '' });
+            alert(`[AI 자동 분류: 고정지출] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
+        } else {
+            const varCats = getCategories('variable');
+            let cat = '생활비';
+            varCats.forEach(c => { if (textPart.includes(c)) cat = c; });
+            const todayStr = `${curKey}-01`;
+            monthData.variableExpenses.push({ id: Date.now(), date: todayStr, cat, desc: textPart || '지출', amount, note: '' });
+            alert(`[AI 자동 분류: 생활비] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
+        }
+
+        saveCloudData();
+        render();
+        document.getElementById('aiSmartText').value = '';
+    }
+
+    window.importSectionData = function(sectionKey) {
+        const curKey = getMonthKey();
+        const [y, m] = curKey.split('-').map(Number);
+        const prevDate = new Date(y, m - 2, 1);
+        const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+
+        if (!allCloudData[prevKey] || !allCloudData[prevKey][sectionKey] || allCloudData[prevKey][sectionKey].length === 0) {
+            alert(`이전 달(${prevKey})에 해당 섹션에 저장된 데이터가 없습니다.`);
+            return;
+        }
+
+        const prevItems = allCloudData[prevKey][sectionKey];
+        const curData = getStoredDataForMonth(curKey);
+
+        let addedCount = 0;
+        prevItems.forEach(item => {
+            let isDuplicate = false;
+            if (sectionKey === 'incomes') {
+                isDuplicate = curData.incomes.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'fixedExpenses') {
+                isDuplicate = curData.fixedExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'flexExpenses') {
+                isDuplicate = curData.flexExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'variableExpenses') {
+                isDuplicate = curData.variableExpenses.some(x => x.desc === item.desc && x.amount === item.amount);
+            } else if (sectionKey === 'assetItems') {
+                isDuplicate = curData.assetItems.some(x => x.name === item.name && x.val === item.val);
+            } else {
+                if (!curData[sectionKey]) curData[sectionKey] = [];
+                isDuplicate = curData[sectionKey].some(x => (x.desc === item.desc || x.name === item.name) && (x.amount === item.amount || x.val === item.val));
+            }
+
+            if (!isDuplicate) {
+                if (!curData[sectionKey]) curData[sectionKey] = [];
+                curData[sectionKey].push({ ...item, id: Date.now() + Math.random() });
+                addedCount++;
+            }
+        });
+
+        if (addedCount > 0) {
+            saveData(curData);
+            alert(`지난달(${prevKey})에서 ${addedCount}개의 항목을 성공적으로 불러왔습니다!`);
+        } else {
+            alert('이미 모든 항목이 이번 달에 존재합니다.');
+        }
+    }
+
+    function getStoredDataForMonth(monthKey) {
+        if (!allCloudData[monthKey]) {
+            allCloudData[monthKey] = {
+                isManualCarry: false,
+                manualCarryVal: 0,
+                incomes: [],
+                fixedExpenses: [],
+                flexExpenses: [],
+                variableExpenses: [],
+                assetItems: []
+            };
+        }
+        return allCloudData[monthKey];
+    }
+
+    function getStoredData(monthKey) {
+        return getStoredDataForMonth(monthKey);
+    }
+
+    function calculateNetWorthFor(monthKey) {
+        const data = getStoredData(monthKey);
+        
+        const [y, m] = monthKey.split('-').map(Number);
+        let carry = 0;
+        if (data.isManualCarry) {
+            carry = data.manualCarryVal || 0;
+        } else if (monthKey === '2026-01' || (y === 2026 && m === 1)) {
+            carry = data.manualCarryVal || 0;
+        } else {
+            let prevKey = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+            if (allCloudData[prevKey]) {
+                carry = calculateNetWorthFor(prevKey);
+            }
+        }
+
+        const defs = getSectionDefs();
+        let inc = 0, exp = 0, regAssets = 0, loans = 0;
+
+        defs.forEach(sec => {
+            if (sec.includeCalc) {
+                const items = data[sec.id] || [];
+                if (sec.type === 'income') {
+                    inc += items.reduce((a, b) => a + (b.amount || 0), 0);
+                } else if (sec.type === 'expense' || sec.type === 'variable') {
+                    exp += items.reduce((a, b) => a + (b.amount || 0), 0);
+                } else if (sec.type === 'asset') {
+                    items.forEach(item => {
+                        if (item.type === '대출잔액') loans += (item.val || 0);
+                        else regAssets += (item.val || 0);
+                    });
+                }
+            }
+        });
+
+        const totalBalance = carry + inc - exp;
+        const totalAssets = totalBalance + regAssets;
+        return totalAssets - loans;
+    }
+
+    function getCalculatedCarryOver(monthKey) {
+        const data = getStoredData(monthKey);
+        if (data.isManualCarry) return data.manualCarryVal || 0;
+
+        const [y, m] = monthKey.split('-').map(Number);
+        if (monthKey === '2026-01' || (y === 2026 && m === 1)) return data.manualCarryVal || 0;
+
+        let prevKey = '';
+        if (m === 1) {
+            prevKey = `${y - 1}-12`;
+        } else {
+            prevKey = `${y}-${String(m - 1).padStart(2, '0')}`;
+        }
+
+        if (!allCloudData[prevKey]) return 0;
+        return calculateNetWorthFor(prevKey);
+    }
+
+    function saveData(data) {
+        allCloudData[getMonthKey()] = data;
+        saveCloudData();
+        render();
+    }
+
+    function applySorting(items, secType, sortMode, catKey) {
+        let sorted = [...items];
+        if (sortMode === 'category') {
+            if (secType === 'income') {
+                sorted.sort((a, b) => (a.name || '').localeCompare(b.name || '') || (a.desc || '').localeCompare(b.desc || ''));
+            } else if (secType === 'expense' || secType === 'variable') {
+                let catOrder = getCategories(catKey);
+                sorted.sort((a, b) => {
+                    let posA = catOrder.indexOf(a.cat);
+                    let posB = catOrder.indexOf(b.cat);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.desc || '').localeCompare(b.desc || '');
+                });
+            } else if (secType === 'asset') {
+                let assetOrder = getCategories('asset');
+                sorted.sort((a, b) => {
+                    let posA = assetOrder.indexOf(a.type);
+                    let posB = assetOrder.indexOf(b.type);
+                    if (posA !== posB) return (posA === -1 ? 999 : posA) - (posB === -1 ? 999 : posB);
+                    return (a.name || '').localeCompare(b.name || '');
+                });
+            }
+        } else if (sortMode === 'alpha') {
+            sorted.sort((a, b) => (a.desc || a.name || '').localeCompare(b.desc || b.name || ''));
+        } else if (sortMode === 'amount_desc') {
+            sorted.sort((a, b) => (b.amount || b.val || 0) - (a.amount || a.val || 0));
+        } else if (sortMode === 'amount_asc') {
+            sorted.sort((a, b) => (a.amount || a.val || 0) - (b.amount || b.val || 0));
+        } else if (sortMode === 'date' && secType === 'variable') {
+            sorted.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        }
+        return sorted;
+    }
+
+    function render() {
+        renderCategorySelects();
+        const curKey = getMonthKey();
+        const data = getStoredData(curKey);
+
+        const familyTitle = allCloudData.familyTitle || '우리집';
+        document.getElementById('familyTitleText').innerText = familyTitle;
+
+        document.getElementById('isManualCarry').checked = data.isManualCarry || false;
+        document.getElementById('carryOverInput').disabled = !data.isManualCarry;
+
+        const carryOver = getCalculatedCarryOver(curKey);
+        document.getElementById('carryOverInput').value = (data.isManualCarry ? (data.manualCarryVal || 0) : carryOver).toLocaleString('ko-KR');
+        document.getElementById('carryStatusText').innerText = data.isManualCarry ? '현재: 수동 입력 모드' : '현재: 전월 순 자산 자동 연동 중';
+        document.getElementById('dispCarryOver').innerText = fmt(carryOver);
+
+        let totalIncome = 0;
+        let totalExpenseSum = 0;
+        let totalAssetBase = 0;
+        let totalAssetsReg = 0, totalLoans = 0;
+
+        const defs = getSectionDefs();
+        let leftHtml = '';
+        let rightHtml = '';
+
+        let sectionSums = {};
+
+        defs.forEach((sec, index) => {
+            if (!data[sec.id]) data[sec.id] = [];
+            let items = [...data[sec.id]];
+            let sortMode = sectionSortModes[sec.id] || 'category';
+
+            let sectionTableHtml = '';
+            let calcBadge = !sec.includeCalc ? '<span style="font-size:0.75rem; color:#d97706; margin-left:6px;">(참고용)</span>' : '';
+            
+            let sortSelectHtml = `
+                <select style="padding:2px 6px; font-size:0.75rem; border:1px solid var(--border); border-radius:4px; background:#f8fafc;" onchange="changeSortMode('${sec.id}', this.value)">
+                    <option value="category" ${sortMode==='category'?'selected':''}>정렬: 분류별</option>
+                    <option value="alpha" ${sortMode==='alpha'?'selected':''}>정렬: 가나다순</option>
+                    <option value="amount_desc" ${sortMode==='amount_desc'?'selected':''}>정렬: 금액 높은순</option>
+                    <option value="amount_asc" ${sortMode==='amount_asc'?'selected':''}>정렬: 금액 낮은순</option>
+                    ${sec.type==='variable'?`<option value="date" ${sortMode==='date'?'selected':''}>정렬: 날짜순</option>`:''}
+                </select>`;
+
+            let secSum = 0;
+
+            if (sec.type === 'income') {
+                items = applySorting(items, 'income', sortMode);
+                let rows = '';
+                items.forEach(item => {
+                    if (sec.includeCalc) totalIncome += item.amount;
+                    secSum += item.amount;
+                    rows += `<tr><td>${item.name}</td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                });
+                rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
+                sectionTableHtml = `
+                    <div class="section-box">
+                        <div class="section-header">
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <input type="text" id="incName_${sec.id}" placeholder="성명">
+                            <input type="text" id="incDesc_${sec.id}" placeholder="항목">
+                            <input type="text" id="incAmount_${sec.id}" placeholder="금액" oninput="formatInputComma(this)">
+                            <input type="text" id="incNote_${sec.id}" placeholder="비고" style="flex:0.8;">
+                            <button class="btn" onclick="addCustomIncome('${sec.id}')">추가</button>
+                        </div>
+                        <table>
+                            <thead><tr><th>성명</th><th>항목</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+            } else if (sec.type === 'expense') {
+                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
+                items = applySorting(items, 'expense', sortMode, catKey);
+
+                let rows = '';
+                items.forEach(item => {
+                    if (sec.includeCalc) {
+                        totalExpenseSum += item.amount;
+                    }
+                    secSum += item.amount;
+                    let badgeCls = getBadgeClass(item.cat, catKey);
+                    rows += `<tr><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                });
+                rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
+                sectionTableHtml = `
+                    <div class="section-box">
+                        <div class="section-header">
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <select id="catSelect_${sec.id}" onchange="checkCategoryOption('${catKey}', this)"></select>
+                            <input type="text" id="desc_${sec.id}" placeholder="내역" style="flex:1.2;">
+                            <input type="text" id="amount_${sec.id}" placeholder="금액" style="flex:0.9;" oninput="formatInputComma(this)">
+                            <input type="text" id="note_${sec.id}" placeholder="비고" style="flex:1;">
+                            <button class="btn" onclick="addCustomExpense('${sec.id}', '${catKey}')">추가</button>
+                        </div>
+                        <table>
+                            <thead><tr><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+            } else if (sec.type === 'variable') {
+                items = applySorting(items, 'variable', sortMode, 'variable');
+
+                let rows = '';
+                items.forEach(item => {
+                    if (sec.includeCalc) {
+                        totalExpenseSum += item.amount;
+                    }
+                    secSum += item.amount;
+                    let badgeCls = getBadgeClass(item.cat, 'variable');
+                    rows += `<tr><td>${item.date || '-'}</td><td><span class="badge ${badgeCls}">${item.cat}</span></td><td>${item.desc}</td><td class="amount">${fmt(item.amount)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editItem('${sec.id}', ${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                });
+                rows += `<tr class="total-row"><td colspan="3" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
+                sectionTableHtml = `
+                    <div class="section-box">
+                        <div class="section-header">
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <input type="date" id="varDate_${sec.id}">
+                            <select id="catSelect_${sec.id}" onchange="checkCategoryOption('variable', this)"></select>
+                            <input type="text" id="desc_${sec.id}" placeholder="내역" style="flex:1;">
+                            <input type="text" id="amount_${sec.id}" placeholder="금액" style="flex:0.8;" oninput="formatInputComma(this)">
+                            <input type="text" id="note_${sec.id}" placeholder="비고" style="flex:0.8;">
+                            <button class="btn" onclick="addCustomVariable('${sec.id}', 'variable')">기록</button>
+                        </div>
+                        <table>
+                            <thead><tr><th>날짜</th><th>분류</th><th>내역</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+            } else if (sec.type === 'asset') {
+                items = applySorting(items, 'asset', sortMode, 'asset');
+
+                let rows = '';
+                items.forEach(item => {
+                    if (sec.includeCalc) {
+                        if (item.type === '대출잔액') {
+                            loans += item.val;
+                        } else {
+                            totalAssetsReg += item.val;
+                            totalAssetBase += item.val;
+                        }
+                    }
+                    secSum += item.val;
+                    let badgeCls = item.type === '대출잔액' ? 'badge loan' : getBadgeClass(item.type, 'asset');
+                    rows += `<tr><td><span class="badge ${badgeCls}">${item.type}</span></td><td>${item.name}</td><td class="amount">${fmt(item.val)}</td><td><input type="text" value="${item.note || ''}" style="width:100%; padding:3px 6px; border:1px solid var(--border); border-radius:4px; font-size:0.8rem;" oninput="updateItemNoteSilent('${sec.id}', ${item.id}, this.value)"></td><td style="text-align:right;"><button class="btn" style="padding:2px 6px; font-size:0.75rem;" onclick="editAssetItem(${item.id})">수정</button> <button class="btn btn-danger" onclick="deleteItem('${sec.id}', ${item.id})">삭제</button></td></tr>`;
+                });
+                rows += `<tr class="total-row"><td colspan="2" style="text-align:center;">합계</td><td class="amount">${fmt(secSum)}</td><td colspan="2"></td></tr>`;
+
+                sectionTableHtml = `
+                    <div class="section-box">
+                        <div class="section-header">
+                            <span class="section-title">${sec.name} ${calcBadge}</span>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${sortSelectHtml}
+                                <button class="btn btn-sub" onclick="importSectionData('${sec.id}')">📥 지난달</button>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <select id="assetType_${sec.id}" onchange="checkCategoryOption('asset', this)"></select>
+                            <input type="text" id="assetName_${sec.id}" placeholder="항목명" style="flex:1.2;">
+                            <input type="text" id="assetVal_${sec.id}" placeholder="금액" style="flex:0.9;" oninput="formatInputComma(this)">
+                            <input type="text" id="assetNote_${sec.id}" placeholder="비고" style="flex:1;">
+                            <button class="btn" onclick="addCustomAsset('${sec.id}')">등록</button>
+                        </div>
+                        <table>
+                            <thead><tr><th>구분</th><th>항목명</th><th style="text-align:right;">금액</th><th style="width:110px;">비고</th><th></th></tr></thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>`;
+            }
+
+            if (sec.type === 'expense' || sec.type === 'variable') {
+                sectionSums[sec.id] = { name: sec.name, amount: secSum };
+            }
+
+            if (index % 2 === 0) leftHtml += sectionTableHtml;
+            else rightHtml += sectionTableHtml;
+        });
+
+        document.getElementById('dynamicSectionsContainer').innerHTML = leftHtml;
+        document.getElementById('dynamicSectionsContainerRight').innerHTML = rightHtml;
+
+        defs.forEach(sec => {
+            if (sec.type === 'expense') {
+                let catKey = sec.id === 'fixedExpenses' ? 'fixed' : 'flex';
+                renderSelectOptions(catKey, `catSelect_${sec.id}`);
+            } else if (sec.type === 'variable') {
+                renderSelectOptions('variable', `catSelect_${sec.id}`);
+            } else if (sec.type === 'asset') {
+                renderSelectOptions('asset', `assetType_${sec.id}`);
+            }
+        });
+
+        // ------------------------------------------------------------------
+        // [완벽 동적 처리] 지출/생활비 성격의 대분류 개수만큼 상단 카드를 100% 자동 생성
+        // ------------------------------------------------------------------
+        let dashboardCardsHtml = `
+            <div class="card">
+                <div class="card-title">이번 달 총 수입</div>
+                <div class="card-value plus" id="dispTotalIncome">${fmt(totalIncome)}</div>
+            </div>`;
+
+        defs.forEach(sec => {
+            if (sec.type === 'expense' || sec.type === 'variable') {
+                let sSum = sectionSums[sec.id] ? sectionSums[sec.id].amount : 0;
+                dashboardCardsHtml += `
+                    <div class="card">
+                        <div class="card-title">${sec.name}</div>
+                        <div class="card-value minus">${fmt(sSum)}</div>
+                    </div>`;
+            }
+        });
+
+        dashboardCardsHtml += `
+            <div class="card">
+                <div class="card-title">전월 이월금</div>
+                <div class="card-value" id="dispCarryOver">${fmt(carryOver)}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">통장 총 잔액</div>
+                <div class="card-value" id="dispTotalBalance">${fmt(carryOver + totalIncome - totalExpenseSum)}</div>
+            </div>`;
+
+        document.getElementById('dynamicDashboardCards').innerHTML = dashboardCardsHtml;
+
+        const availableMoney = totalIncome - totalAssetBase - totalExpenseSum;
+        const totalBalance = carryOver + totalIncome - totalExpenseSum;
+        const totalAssets = totalBalance + totalAssetsReg;
+
+        const availElem = document.getElementById('dispAvailableMoney');
+        availElem.innerText = fmt(availableMoney);
+        availElem.className = availableMoney < 0 ? 'hero-value minus' : 'hero-value';
+
+        document.getElementById('dispAvailableCalc').innerText = `당월 수입(${fmt(totalIncome)}) - 총 지출항목 합계(${fmt(totalExpenseSum)}) - 예적금/주식 등(${fmt(totalAssetBase)})`;
+        document.getElementById('dispTotalAssets').innerText = fmt(totalAssets);
+        document.getElementById('dispTotalLoans').innerText = fmt(totalLoans);
+        document.getElementById('dispNetWorth').innerText = fmt(totalAssets - totalLoans);
+    }
+
+    function renderSelectOptions(type, selectId) {
+        const cats = getCategories(type);
+        const select = document.getElementById(selectId);
+        if (!select) return;
+        let html = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+        html += `<option value="__MANAGE__" style="color:#7c3aed; font-weight:bold;">⚙️ 소항목 관리(추가/수정/삭제)...</option>`;
+        select.innerHTML = html;
     }
 
     window.checkCategoryOption = function(targetType, selectElem) {
