@@ -419,7 +419,7 @@
     </div>
 </div>
 
-<!-- 엑셀 업로드 모달 -->
+<!-- 맞춤형 엑셀 업로드 모달 -->
 <div class="modal-overlay" id="aiModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -537,6 +537,15 @@
     let verifiedEmail = '';
     let sectionSortModes = {};
 
+    /* 오늘 날짜를 YYYY-MM-DD 포맷으로 반환하는 함수 */
+    function getTodayString() {
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
     window.onload = function() {
         const savedEmail = localStorage.getItem('saved_email');
         if (savedEmail) {
@@ -604,7 +613,7 @@
         });
     }
 
-    /* 회원가입 모달 제어 및 중복확인 기능 복원 */
+    /* 회원가입 모달 제어 및 중복확인 기능 */
     window.openSignupModal = function() {
         document.getElementById('signupEmail').value = '';
         document.getElementById('signupPassword').value = '';
@@ -1349,10 +1358,10 @@
         saveData(data);
     }
 
-    /* 생활비 입력란 (날짜 선택 기능 재반영) */
+    /* 생활비 입력란 (오늘 날짜 자동 연동) */
     window.addCustomVariable = function(secId, catKey) {
         const dateInput = document.getElementById(`varDate_${secId}`);
-        const date = dateInput ? dateInput.value : `${getMonthKey()}-01`;
+        const date = (dateInput && dateInput.value) ? dateInput.value : getTodayString();
         const cat = document.getElementById(`catSelect_${secId}`).value;
         const desc = document.getElementById(`desc_${secId}`).value;
         const amount = parseAmount(document.getElementById(`amount_${secId}`).value);
@@ -1384,7 +1393,7 @@
         }
     }
 
-    /* 행 단위 통합 수정 모달 로직 (날짜, 분류, 내역, 금액, 비고 한 번에 수정 가능) */
+    /* 행 단위 통합 수정 모달 로직 */
     window.openRowEditModal = function(secId, itemId) {
         const data = getStoredData(getMonthKey());
         const item = (data[secId] || []).find(x => x.id === itemId);
@@ -1422,7 +1431,7 @@
             groupDate.style.display = 'flex';
             groupCat.style.display = 'flex';
             
-            document.getElementById('editRowDate').value = item.date || `${getMonthKey()}-01`;
+            document.getElementById('editRowDate').value = item.date || getTodayString();
             
             document.getElementById('editCategoryLabel').innerText = '분류';
             let cats = getCategories('variable');
@@ -1814,9 +1823,10 @@
                 renderSelectOptions(catKey, `catSelect_${sec.id}`);
             } else if (sec.type === 'variable') {
                 renderSelectOptions('variable', `catSelect_${sec.id}`);
+                /* 생활비 날짜 입력창 기본값을 오늘 날짜로 자동 설정 */
                 let varDateElem = document.getElementById(`varDate_${sec.id}`);
-                if (varDateElem && !varDateElem.value) {
-                    varDateElem.value = `${curKey}-01`;
+                if (varDateElem) {
+                    varDateElem.value = getTodayString();
                 }
             } else if (sec.type === 'asset') {
                 renderSelectOptions('asset', `assetType_${sec.id}`);
@@ -2145,7 +2155,7 @@
             const varCats = getCategories('variable');
             let cat = '생활비';
             varCats.forEach(c => { if (textPart.includes(c)) cat = c; });
-            const todayStr = `${curKey}-01`;
+            const todayStr = getTodayString();
             monthData.variableExpenses.push({ id: Date.now(), date: todayStr, cat, desc: textPart || '지출', amount, note: '' });
             alert(`[AI 자동 분류: 생활비] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
         }
