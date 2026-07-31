@@ -47,6 +47,9 @@
         .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .month-selector input { padding: 8px 14px; border-radius: 6px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; }
 
+        /* 헤더 우측 버튼 패딩 및 규격 일괄 통일 */
+        .header-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
         .nav-tab { padding: 10px 20px; border-radius: 8px; background: #e2e8f0; border: none; font-weight: bold; cursor: pointer; font-size: 0.95rem; color: #475569; }
         .nav-tab.active { background: var(--accent); color: white; }
@@ -133,13 +136,32 @@
         <label><input type="checkbox" id="rememberLoginCheck" checked> 로그인 유지</label>
     </div>
     <button onclick="handleLogin()">로그인</button>
-    <button style="background:#16a34a;" onclick="handleSignup()">계정 만들기 (회원가입)</button>
+    <button style="background:#16a34a;" onclick="openSignupModal()">계정 만들기 (회원가입)</button>
     <button class="google-btn" onclick="handleGoogleLogin()">
         <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84c-.21 1.12-.85 2.08-1.81 2.72v2.26h2.92c1.71-1.57 2.69-3.88 2.69-6.63z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.33-1.58-5.04-3.71H.95v2.33C2.43 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.96 10.71c-.18-.54-.28-1.12-.28-1.71s.1-1.17.28-1.71V4.96H.95C.35 6.15 0 7.52 0 9s.35 2.85.95 4.04l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.43 2.02.95 4.96l3.01 2.33c.71-2.13 2.7-3.71 5.04-3.71z"/></svg>
         Google 계정으로 로그인
     </button>
     <div class="login-links">
         <span onclick="handleForgotPassword()">비밀번호를 잊으셨나요? (비밀번호 재설정)</span>
+    </div>
+</div>
+
+<!-- 회원가입 팝업 모달 -->
+<div class="modal-overlay" id="signupModal">
+    <div class="modal-box" style="max-width: 400px;">
+        <div class="modal-header">
+            <span>📝 새 계정 만들기</span>
+            <span style="cursor:pointer; font-size:1.2rem;" onclick="closeSignupModal()">&times;</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+            <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+            <input type="password" id="signupPassword" placeholder="비밀번호 (6자리 이상)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+            <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+        </div>
+        <div style="display:flex; gap:8px;">
+            <button class="btn btn-green" style="flex:1; padding:10px;" onclick="executeSignup()">가입완료</button>
+            <button class="btn btn-danger" style="flex:1; padding:10px;" onclick="closeSignupModal()">취소</button>
+        </div>
     </div>
 </div>
 
@@ -537,12 +559,46 @@
         });
     }
 
-    window.handleSignup = function() {
-        const email = document.getElementById('loginEmail').value;
-        const pw = document.getElementById('loginPassword').value;
+    /* 회원가입 모달 제어 및 실행 */
+    window.openSignupModal = function() {
+        document.getElementById('signupEmail').value = '';
+        document.getElementById('signupPassword').value = '';
+        document.getElementById('signupPasswordConfirm').value = '';
+        document.getElementById('signupModal').classList.add('active');
+    }
+
+    window.closeSignupModal = function() {
+        document.getElementById('signupModal').classList.remove('active');
+    }
+
+    window.executeSignup = function() {
+        const email = document.getElementById('signupEmail').value.trim();
+        const pw = document.getElementById('signupPassword').value;
+        const pwConfirm = document.getElementById('signupPasswordConfirm').value;
+
+        if (!email || !pw || !pwConfirm) {
+            alert('모든 가입 정보를 입력해주세요.');
+            return;
+        }
+        if (pw.length < 6) {
+            alert('비밀번호는 최소 6자리 이상이어야 합니다.');
+            return;
+        }
+        if (pw !== pwConfirm) {
+            alert('비밀번호와 비밀번호 확인이 일치하지 않습니다.');
+            return;
+        }
+
         auth.createUserWithEmailAndPassword(email, pw).then(() => {
-            alert('계정이 생성되었습니다!');
-        }).catch(err => alert('회원가입 실패: ' + err.message));
+            alert('회원가입이 완료되었습니다! 로그인 상태로 전환됩니다.');
+            closeSignupModal();
+        }).catch(err => {
+            if (err.code === 'auth/email-already-in-use') {
+                alert('이미 가입된 아이디(이메일)입니다. 다른 이메일을 사용하거나 로그인해 주세요.');
+            } else {
+                alert('회원가입 실패: ' + err.message);
+            }
+        });
     }
 
     window.handleForgotPassword = function() {
@@ -970,7 +1026,7 @@
             if (type === 'fixed') allCloudData.categories[type] = ["대출 상환", "보험료", "계모임/경조사", "구독/할부", "기타 고정"];
             else if (type === 'flex') allCloudData.categories[type] = ["통신비", "아파트 관리비", "가스비/난방비", "전기세/수도세", "출퇴근 주유비", "교통비", "기타 변동고정"];
             else if (type === 'asset') allCloudData.categories[type] = ["예적금", "주식", "기타자산", "대출잔액"];
-            else if (type === 'variable') allCloudData.categories[type] = ["통 생활비", "식비/장보기", "커피/디저트", "생필품/쇼핑", "의류/미용", "주식 매도 손실", "기타 변동"];
+            else if (type === 'variable') allCloudData.categories[type] = ["생활비", "식비/장보기", "커피/디저트", "생필품/쇼핑", "의류/미용", "주식 매도 손실", "기타 변동"];
         }
         return allCloudData.categories[type];
     }
@@ -1297,7 +1353,7 @@
                                         totalAdded++;
                                     }
                                 } else {
-                                    let subCat = '통 생활비';
+                                    let subCat = '생활비';
                                     if (descText.includes('식비') || descText.includes('마트')) subCat = '식비/장보기';
                                     else if (descText.includes('커피') || descText.includes('카페')) subCat = '커피/디저트';
                                     else if (descText.includes('쇼핑') || descText.includes('생필품')) subCat = '생필품/쇼핑';
@@ -1356,7 +1412,7 @@
             alert(`[AI 자동 분류: 고정지출] '${cat}' - '${textPart}' 추가 완료! (${fmt(amount)})`);
         } else {
             const varCats = getCategories('variable');
-            let cat = '통 생활비';
+            let cat = '생활비';
             varCats.forEach(c => { if (textPart.includes(c)) cat = c; });
             const todayStr = `${curKey}-01`;
             monthData.variableExpenses.push({ id: Date.now(), date: todayStr, cat, desc: textPart || '지출', amount, note: '' });
