@@ -151,15 +151,19 @@
     </div>
 </div>
 
-<!-- 회원가입 팝업 모달 -->
+<!-- 회원가입 팝업 모달 (복원) -->
 <div class="modal-overlay" id="signupModal">
-    <div class="modal-box" style="max-width: 400px;">
+    <div class="modal-box" style="max-width: 440px;">
         <div class="modal-header">
             <span>📝 새 계정 만들기</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeSignupModal()">&times;</span>
         </div>
         <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
-            <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
+            <div style="display:flex; gap:6px;">
+                <input type="email" id="signupEmail" placeholder="이메일 주소 (아이디)" style="flex:1; padding:10px; border:1px solid var(--border); border-radius:6px;" oninput="onSignupEmailInput()">
+                <button class="btn btn-purple" style="padding: 0 12px; font-size: 0.85rem;" onclick="checkEmailDuplicate()">중복확인</button>
+            </div>
+            <div id="emailCheckStatus" style="font-size:0.78rem; margin-top:-4px; margin-bottom:2px; display:none;"></div>
             <input type="password" id="signupPassword" placeholder="비밀번호 (6자리 이상)" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
             <input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:6px;">
         </div>
@@ -228,7 +232,7 @@
             <div class="hero-sub" id="dispAvailableCalc">당월 수입 - 총 지출 - 예적금/주식 등</div>
         </div>
 
-        <!-- 상단 대시보드 요약 카드 영역 (고정 HTML 컨테이너 안에 JS가 동적 생성) -->
+        <!-- 상단 대시보드 요약 카드 영역 -->
         <div class="dashboard-grid" id="dynamicDashboardCards">
             <div class="card">
                 <div class="card-title">이번 달 총 수입</div>
@@ -259,7 +263,6 @@
             </div>
         </div>
 
-        <!-- 자산 카드 아래 빈 공간에 위치한 내역 항목(대분류) 관리 버튼 -->
         <div style="margin-bottom: 20px; text-align: left;">
             <button class="btn btn-purple" style="background:#7c3aed; padding: 8px 16px; font-size: 0.9rem;" onclick="openSectionManagerModal()">⚙️ 내역 항목(대분류) 관리</button>
         </div>
@@ -278,12 +281,10 @@
                     <div style="font-size:0.8rem; color:var(--text-muted);" id="carryStatusText">현재: 전월 순 자산 자동 연동 중</div>
                 </div>
 
-                <!-- 동적 섹션들이 렌더링되는 메인 영역 -->
                 <div id="dynamicSectionsContainer"></div>
             </div>
 
             <div>
-                <!-- 오른쪽 동적 섹션들이 렌더링되는 영역 -->
                 <div id="dynamicSectionsContainerRight"></div>
             </div>
         </div>
@@ -291,7 +292,6 @@
 
     <!-- 탭 2: 통계 -->
     <div id="tab-compare" class="tab-content">
-        <!-- 키워드별 상세 비교 검색 박스 -->
         <div class="section-box" style="background: #eff6ff; border-color: #bfdbfe;">
             <div class="section-header"><span class="section-title" style="color: #1e40af;">🔍 키워드별 상세 지출 비교 통계 (예: 통신, 보험, 식비 등)</span></div>
             <div class="form-row">
@@ -374,7 +374,7 @@
     </div>
 </div>
 
-<!-- 내역 항목(대분류) 관리 모달 -->
+<!-- 대분류 관리 모달 -->
 <div class="modal-overlay" id="sectionManagerModal">
     <div class="modal-box" style="max-width: 600px;">
         <div class="modal-header">
@@ -419,7 +419,7 @@
     </div>
 </div>
 
-<!-- 맞춤형 엑셀 업로드 모달 -->
+<!-- 엑셀 업로드 모달 -->
 <div class="modal-overlay" id="aiModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -533,6 +533,8 @@
     let hasAlertedInvite = false;
     let currentEditingTarget = 'fixed';
     
+    let isEmailChecked = false;
+    let verifiedEmail = '';
     let sectionSortModes = {};
 
     window.onload = function() {
@@ -602,16 +604,64 @@
         });
     }
 
-    /* 회원가입 모달 제어 및 실행 */
+    /* 회원가입 모달 제어 및 중복확인 기능 (복원) */
     window.openSignupModal = function() {
         document.getElementById('signupEmail').value = '';
         document.getElementById('signupPassword').value = '';
         document.getElementById('signupPasswordConfirm').value = '';
+        const statusEl = document.getElementById('emailCheckStatus');
+        statusEl.style.display = 'none';
+        statusEl.innerText = '';
+        isEmailChecked = false;
+        verifiedEmail = '';
         document.getElementById('signupModal').classList.add('active');
     }
 
     window.closeSignupModal = function() {
         document.getElementById('signupModal').classList.remove('active');
+    }
+
+    window.onSignupEmailInput = function() {
+        isEmailChecked = false;
+        verifiedEmail = '';
+        const statusEl = document.getElementById('emailCheckStatus');
+        statusEl.style.display = 'none';
+        statusEl.innerText = '';
+    }
+
+    window.checkEmailDuplicate = function() {
+        const email = document.getElementById('signupEmail').value.trim();
+        const statusEl = document.getElementById('emailCheckStatus');
+
+        if (!email) {
+            alert('중복확인할 이메일 주소를 입력해주세요.');
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            alert('올바른 이메일 형식이 아닙니다.');
+            return;
+        }
+
+        auth.fetchSignInMethodsForEmail(email).then(methods => {
+            statusEl.style.display = 'block';
+            if (methods && methods.length > 0) {
+                isEmailChecked = false;
+                verifiedEmail = '';
+                statusEl.style.color = 'var(--danger)';
+                statusEl.innerText = '❌ 이미 가입된 아이디(이메일)입니다.';
+                alert('이미 사용 중인 이메일 주소입니다.');
+            } else {
+                isEmailChecked = true;
+                verifiedEmail = email;
+                statusEl.style.color = 'var(--success)';
+                statusEl.innerText = '✅ 사용 가능한 아이디(이메일)입니다.';
+                alert('사용 가능한 이메일 주소입니다.');
+            }
+        }).catch(err => {
+            alert('중복 확인 중 오류가 발생했습니다: ' + err.message);
+        });
     }
 
     window.executeSignup = function() {
@@ -623,6 +673,12 @@
             alert('모든 가입 정보를 입력해주세요.');
             return;
         }
+
+        if (!isEmailChecked || verifiedEmail !== email) {
+            alert('먼저 이메일 중복확인을 완료해주세요.');
+            return;
+        }
+
         if (pw.length < 6) {
             alert('비밀번호는 최소 6자리 이상이어야 합니다.');
             return;
@@ -1293,16 +1349,16 @@
         saveData(data);
     }
 
-    /* 생활비 항목 추가 시 날짜 선택 처리 */
+    /* 생활비 입력란 (기존 방식 유지) */
     window.addCustomVariable = function(secId, catKey) {
-        const dateInput = document.getElementById(`varDate_${secId}`);
-        const date = dateInput ? dateInput.value : `${getMonthKey()}-01`;
+        const curKey = getMonthKey();
+        const date = `${curKey}-01`;
         const cat = document.getElementById(`catSelect_${secId}`).value;
         const desc = document.getElementById(`desc_${secId}`).value;
         const amount = parseAmount(document.getElementById(`amount_${secId}`).value);
         const note = document.getElementById(`note_${secId}`).value.trim();
         if (!desc || !amount) return alert('내역과 금액을 입력해주세요.');
-        const data = getStoredData(getMonthKey());
+        const data = getStoredData(curKey);
         data[secId].push({ id: Date.now(), date, cat, desc, amount, note });
         saveData(data);
     }
@@ -1328,9 +1384,7 @@
         }
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* 행 단위 통합 수정 모달 로직 (날짜, 분류, 내역, 금액, 비고 한 번에 수정) */
-    /* ---------------------------------------------------------------------- */
+    /* 행 단위 통합 수정 모달 로직 (생활비 포함 모든 항목 수정 시 날짜까지 한 번에 수정 가능) */
     window.openRowEditModal = function(secId, itemId) {
         const data = getStoredData(getMonthKey());
         const item = (data[secId] || []).find(x => x.id === itemId);
@@ -1689,7 +1743,6 @@
                             </div>
                         </div>
                         <div class="form-row">
-                            <input type="date" id="varDate_${sec.id}">
                             <select id="catSelect_${sec.id}" onchange="checkCategoryOption('variable', this)"></select>
                             <input type="text" id="desc_${sec.id}" placeholder="내역" style="flex:1;">
                             <input type="text" id="amount_${sec.id}" placeholder="금액" style="flex:0.8;" oninput="formatInputComma(this)">
@@ -1760,10 +1813,6 @@
                 renderSelectOptions(catKey, `catSelect_${sec.id}`);
             } else if (sec.type === 'variable') {
                 renderSelectOptions('variable', `catSelect_${sec.id}`);
-                let varDateElem = document.getElementById(`varDate_${sec.id}`);
-                if (varDateElem && !varDateElem.value) {
-                    varDateElem.value = `${curKey}-01`;
-                }
             } else if (sec.type === 'asset') {
                 renderSelectOptions('asset', `assetType_${sec.id}`);
             }
