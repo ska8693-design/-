@@ -47,7 +47,10 @@
         .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .month-selector input { padding: 8px 14px; border-radius: 6px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; }
 
-        /* 헤더 우측 버튼 패딩 및 규격 일괄 통일 */
+        /* 메인 헤더 모드 선택 드롭다운 스타일 */
+        .mode-select-dropdown { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.2); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; }
+        .mode-select-dropdown option { background: var(--primary); color: white; }
+
         .header-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
 
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
@@ -182,7 +185,11 @@
             <button class="btn btn-sub" style="padding: 2px 6px; font-size: 0.75rem; background: rgba(255,255,255,0.2);" onclick="editFamilyTitle()">⚙️ 가계부 이름 변경</button>
         </h1>
         <div class="header-right" style="font-size: 0.85rem; align-items: center;">
-            <span id="currentConnectedInfo" style="background: rgba(255,255,255,0.15); padding: 4px 8px; border-radius: 4px; font-weight: 500;">연동 중...</span>
+            <!-- 드롭다운 방식 모드 전환 스위치 -->
+            <select id="mainModeDropdown" class="mode-select-dropdown" onchange="onMainModeDropdownChange(this.value)">
+                <option value="personal">🔒 내 개인 가계부</option>
+                <option value="shared_data">👥 연동된 공유 가계부</option>
+            </select>
             <span id="autoSaveStatus" style="font-size: 0.75rem; color: #cbd5e1;">(자동저장 대기중)</span>
             <div class="month-selector">
                 <input type="month" id="currentMonth" onchange="loadMonthData()">
@@ -452,10 +459,10 @@
         
         <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
             <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
-            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
+            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">공용 가계부 접속 중</div>
             <div style="display:flex; gap:8px;">
                 <button class="btn" style="flex:1; background:#475569; padding:6px;" onclick="switchToMyPersonalBudget()">내 개인 가계부 보기</button>
-                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px; display:none;" onclick="switchToLinkedBudget()">연동된 공유 가계부 보기</button>
+                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px;" onclick="switchToLinkedBudget()">공용 가계부 보기</button>
                 <button class="btn btn-danger" id="unlinkBtn" style="padding:6px; display:none;" onclick="unlinkFamilyAccount()">연동 해제</button>
             </div>
         </div>
@@ -525,7 +532,7 @@
     const db = firebase.firestore();
 
     let allCloudData = {};
-    let currentTargetDocId = '';
+    let currentTargetDocId = 'shared_data'; // 기본 접속 경로를 shared_data로 고정
     let currentUserEmail = '';
     let isDataDirty = false;
     let inviteUnsubscribe = null;
@@ -760,9 +767,21 @@
             unlinkBtn.style.display = 'block';
         } else {
             statusText.innerText = '현재 내 개인 고유 가계부 보는 중';
-            switchLinkedBtn.style.display = linkedDocId && linkedDocId !== myPersonalDocId ? 'block' : 'none';
+            switchLinkedBtn.style.display = 'block';
             unlinkBtn.style.display = 'none';
         }
+    }
+
+    /* 헤더 메인 드롭다운 변경 이벤트 */
+    window.onMainModeDropdownChange = function(val) {
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        if (val === 'personal') {
+            currentTargetDocId = myPersonalDocId;
+        } else {
+            currentTargetDocId = 'shared_data';
+        }
+        saveUserLinkedDocId(currentTargetDocId);
+        fetchCloudData();
     }
 
     window.switchToMyPersonalBudget = function() {
@@ -775,13 +794,11 @@
     }
 
     window.switchToLinkedBudget = function() {
-        const uid = auth.currentUser.uid;
-        const linkedDocId = localStorage.getItem(`linked_family_${uid}`) || 'shared_data';
-        currentTargetDocId = linkedDocId;
-        saveUserLinkedDocId(linkedDocId);
+        currentTargetDocId = 'shared_data';
+        saveUserLinkedDocId(currentTargetDocId);
         closeFamilyModal();
         fetchCloudData();
-        alert('공유 가계부로 전환되었습니다.');
+        alert('공동 가계부로 전환되었습니다.');
     }
 
     window.unlinkFamilyAccount = function() {
@@ -797,7 +814,6 @@
         }
     }
 
-    /* Firestore 계정 정보에 연동 문서 ID 동기화 보장 */
     function saveUserLinkedDocId(docId) {
         if (!auth.currentUser) return;
         const uid = auth.currentUser.uid;
@@ -807,6 +823,13 @@
             email: currentUserEmail,
             updatedAt: Date.now()
         }, { merge: true });
+
+        /* 헤더 드롭다운 UI 상태 동기화 */
+        const mainDropdown = document.getElementById('mainModeDropdown');
+        if (mainDropdown) {
+            const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            mainDropdown.value = (docId === myPersonalDocId) ? 'personal' : 'shared_data';
+        }
     }
 
     window.sendFamilyInvitation = function() {
@@ -991,7 +1014,6 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainAppContainer').classList.add('active');
             
-            // DB에 저장된 사용자의 연동 가계부 문서 정보 확인
             db.collection("users").doc(user.uid).get().then(docSnap => {
                 if (docSnap.exists && docSnap.data().linkedDocId) {
                     currentTargetDocId = docSnap.data().linkedDocId;
@@ -999,6 +1021,13 @@
                     const savedLink = localStorage.getItem(`linked_family_${user.uid}`);
                     currentTargetDocId = savedLink || 'shared_data';
                 }
+                
+                const mainDropdown = document.getElementById('mainModeDropdown');
+                if (mainDropdown) {
+                    const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                    mainDropdown.value = (currentTargetDocId === myPersonalDocId) ? 'personal' : 'shared_data';
+                }
+
                 fetchCloudData();
             }).catch(() => {
                 currentTargetDocId = 'shared_data';
@@ -1018,7 +1047,8 @@
 
     function fetchCloudData() {
         if (!currentTargetDocId) currentTargetDocId = 'shared_data';
-        let displayTarget = currentTargetDocId === 'shared_data' ? '공용 가계부' : '개인 가계부';
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        let displayTarget = currentTargetDocId === myPersonalDocId ? '개인 가계부' : '공유 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
