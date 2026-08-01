@@ -886,27 +886,28 @@
         return true;
     }
 
-    /* 드롭다운 항목 업데이트 (공유중 / 열람중 명확한 표현 추가) */
+    /* 드롭다운 항목 업데이트 (내 화면 상대방 아이디엔 (공유중), 상대방 화면 내 아이디엔 (열람중)) */
     function updateMainModeDropdown() {
         const select = document.getElementById('mainModeDropdown');
         if (!select) return;
 
         const myPersonalDocId = getMyPersonalDocId();
         
-        // 내 가계부가 다른 사람에게 공유중인지 체크
-        let isMyBudgetSharedWithOthers = false;
-        if (allCloudData.permissions) {
-            const otherUsers = Object.keys(allCloudData.permissions).filter(
-                email => email.toLowerCase() !== currentUserEmail.toLowerCase()
-            );
-            if (otherUsers.length > 0) isMyBudgetSharedWithOthers = true;
-        }
-
-        const myLabelSuffix = isMyBudgetSharedWithOthers ? ' (공유중)' : '';
-        let html = `<option value="${myPersonalDocId}">🔒 내 개인 가계부 (${currentUserEmail})${myLabelSuffix}</option>`;
+        // 내 기본 개인 가계부 옵션
+        let html = `<option value="${myPersonalDocId}">🔒 내 개인 가계부 (${currentUserEmail})</option>`;
         
+        // 상대방 아이디 목록 렌더링
         sharedBudgetsList.forEach(b => {
-            html += `<option value="${b.docId}">👥 공유: ${b.ownerEmail} 님의 가계부 (열람중)</option>`;
+            let statusTag = '';
+            // b.docId 가 내 개인 가계부라면 -> 내 가계부를 상대방에게 제공중이므로 (공유중)
+            if (b.docId === myPersonalDocId) {
+                statusTag = ' (공유중)';
+            } else {
+                // b.docId 가 상대방 가계부라면 -> 상대 가계부를 내가 보고 있으므로 (열람중)
+                statusTag = ' (열람중)';
+            }
+
+            html += `<option value="${b.docId}">👥 공유: ${b.ownerEmail} 님의 가계부${statusTag}</option>`;
         });
 
         select.innerHTML = html;
@@ -1099,6 +1100,14 @@
                         userEmail: invData.senderEmail.toLowerCase(),
                         docId: myPersonalDocId,
                         ownerEmail: currentUserEmail.toLowerCase(),
+                        createdAt: Date.now()
+                    });
+
+                    // 요청 수락자(나)의 목록에도 양방향 표시용으로 상대방 정보를 등록
+                    db.collection("shared_access").doc(`${currentUserEmail.toLowerCase()}_${myPersonalDocId}`).set({
+                        userEmail: currentUserEmail.toLowerCase(),
+                        docId: myPersonalDocId,
+                        ownerEmail: invData.senderEmail.toLowerCase(),
                         createdAt: Date.now()
                     });
 
