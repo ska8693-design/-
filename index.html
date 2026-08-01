@@ -784,7 +784,7 @@
         renderSharedUserPermissionsList();
     }
 
-    /* 사용자별 개별 권한 변경 및 렌더링 */
+    /* 사용자별 개별 권한 변경 및 렌더링 (본인 이메일은 목록에서 제외) */
     function renderSharedUserPermissionsList() {
         const permListEl = document.getElementById('sharedUserPermissionsList');
         if (!permListEl) return;
@@ -792,9 +792,12 @@
 
         if (!allCloudData.permissions) allCloudData.permissions = {};
 
-        const userEmails = Object.keys(allCloudData.permissions);
+        const userEmails = Object.keys(allCloudData.permissions).filter(
+            email => email.toLowerCase() !== currentUserEmail.toLowerCase()
+        );
+
         if (userEmails.length === 0) {
-            permListEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:6px;">공유중인 사용자가 없습니다.</div>';
+            permListEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:6px;">공유중인 상대방이 없습니다.</div>';
             return;
         }
 
@@ -802,7 +805,7 @@
             const currentPerm = allCloudData.permissions[email] || 'write';
             const cleanKey = email.replace(/[^a-z0-9]/g, '_');
             permListEl.innerHTML += `
-                <div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; border-bottom:1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border);">
                     <span><b>${email}</b></span>
                     <div style="display:flex; gap:4px; align-items:center;">
                         <select id="perm_sel_${cleanKey}" style="padding:2px 4px; font-size:0.8rem; border:1px solid var(--border); border-radius:4px;">
@@ -897,7 +900,7 @@
         updateMainModeDropdown();
     }
 
-    /* 초대한 유저 가계부의 원본 docId로 변경 */
+    /* 초대한 유저 가계부의 원본 docId 전송 */
     window.sendFamilyInvitation = function() {
         const targetEmail = document.getElementById('targetFamilyEmail').value.trim().toLowerCase();
         if (!targetEmail) {
@@ -928,6 +931,7 @@
         });
     }
 
+    /* 연동 요청 시 상대방 문서 ID를 정확하게 담아 요청 전송 */
     window.sendConnectionRequest = function() {
         const targetEmail = document.getElementById('targetRequestEmail').value.trim().toLowerCase();
         if (!targetEmail) {
@@ -1023,37 +1027,60 @@
             });
     }
 
+    /* 초대/연동 요청 수락/거부 처리 로직 (양방향 매핑 완료) */
     window.respondInvitation = function(inviteId, targetDocId, senderEmail, isAccepted) {
         if (isAccepted) {
             const uid = auth.currentUser.uid;
-            
-            // 내 접근 목록 매핑 테이블 저장
-            db.collection("shared_access").doc(`${uid}_${targetDocId}`).set({
-                userUid: uid,
-                userEmail: currentUserEmail.toLowerCase(),
-                docId: targetDocId,
-                ownerEmail: senderEmail,
-                createdAt: Date.now()
-            });
+            const myPersonalDocId = getMyPersonalDocId();
 
-            // 상대방 가계부의 기본 권한을 'write' 로 등록
-            db.collection("family_budget").doc(targetDocId).get().then(docSnap => {
-                let permData = {};
-                if (docSnap.exists && docSnap.data().permissions) {
-                    permData = docSnap.data().permissions;
+            db.collection("family_invites").doc(inviteId).get().then(invSnap => {
+                const invData = invSnap.data();
+
+                if (invData.type === 'request_to_join') {
+                    // 상대방 연동 요청 수락 ➔ 요청한 사람(sender)에게 내 가계부(myPersonalDocId) 권한 부여
+                    db.collection("shared_access").doc(`${invData.senderEmail}_${myPersonalDocId}`).set({
+                        userEmail: invData.senderEmail.toLowerCase(),
+                        docId: myPersonalDocId,
+                        ownerEmail: currentUserEmail.toLowerCase(),
+                        createdAt: Date.now()
+                    });
+
+                    // 내 가계부 permissions 객체에 상대방 권한 등록
+                    if (!allCloudData.permissions) allCloudData.permissions = {};
+                    allCloudData.permissions[invData.senderEmail.toLowerCase()] = 'write';
+                    saveCloudData();
+
+                    alert('연동 요청을 수락했습니다! 상대방 화면에서 내 가계부가 공유됩니다.');
+                } else {
+                    // 초대 수락 ➔ 내 접근 목록(shared_access)에 상대방 가계부 추가
+                    db.collection("shared_access").doc(`${uid}_${targetDocId}`).set({
+                        userUid: uid,
+                        userEmail: currentUserEmail.toLowerCase(),
+                        docId: targetDocId,
+                        ownerEmail: senderEmail,
+                        createdAt: Date.now()
+                    });
+
+                    // 상대방 가계부의 permissions에 내 이메일 권한 등록
+                    db.collection("family_budget").doc(targetDocId).get().then(docSnap => {
+                        let permData = {};
+                        if (docSnap.exists && docSnap.data().permissions) {
+                            permData = docSnap.data().permissions;
+                        }
+                        permData[currentUserEmail.toLowerCase()] = 'write';
+                        db.collection("family_budget").doc(targetDocId).set({ permissions: permData }, { merge: true });
+                    });
+
+                    currentTargetDocId = targetDocId;
+                    saveUserLinkedDocId(currentTargetDocId);
+                    alert('초대를 수락했습니다! 해당 공유 가계부로 전환됩니다.');
                 }
-                permData[currentUserEmail.toLowerCase()] = 'write';
-                db.collection("family_budget").doc(targetDocId).set({ permissions: permData }, { merge: true });
-            });
 
-            currentTargetDocId = targetDocId;
-            saveUserLinkedDocId(currentTargetDocId);
-            
-            db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
-                alert('요청을 수락했습니다! 가계부 연동이 완료되었습니다.');
-                closeFamilyModal();
-                loadSharedBudgetsList().then(() => {
-                    fetchCloudData();
+                db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
+                    closeFamilyModal();
+                    loadSharedBudgetsList().then(() => {
+                        fetchCloudData();
+                    });
                 });
             });
         } else {
