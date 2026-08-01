@@ -42,17 +42,21 @@
         .login-links { margin-top: 10px; font-size: 0.85rem; }
         .login-links span { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--primary); color: white; padding: 20px; border-radius: 12px; flex-wrap: wrap; gap: 10px; }
+        /* 헤더 상대 위치 설정 (우측 상단 절대 위치 배치를 위함) */
+        header { position: relative; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--primary); color: white; padding: 20px; padding-top: 25px; border-radius: 12px; flex-wrap: wrap; gap: 10px; }
         header h1 { font-size: 1.4rem; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
         .month-selector input { padding: 8px 14px; border-radius: 6px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; }
+
+        /* 헤더 우측 상단 고정 로그아웃 버튼 */
+        .logout-top-right { position: absolute; top: 15px; right: 20px; z-index: 10; }
 
         /* 메인 헤더 드롭다운 커스텀 스타일 */
         .mode-select-dropdown { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; height: 38px; }
         .mode-select-dropdown option { background: var(--primary); color: white; }
 
         /* 헤더 우측 버튼 패딩 및 규격 일괄 통일 */
-        .header-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+        .header-right .btn, .logout-top-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
 
         .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); padding-bottom: 10px; }
         .nav-tab { padding: 10px 20px; border-radius: 8px; background: #e2e8f0; border: none; font-weight: bold; cursor: pointer; font-size: 0.95rem; color: #475569; }
@@ -185,6 +189,12 @@
             💰 <span id="familyTitleText">우리집</span> 스마트 가계부 & 자산관리
             <button class="btn btn-sub" style="padding: 2px 6px; font-size: 0.75rem; background: rgba(255,255,255,0.2);" onclick="editFamilyTitle()">⚙️ 가계부 이름 변경</button>
         </h1>
+        
+        <!-- 오른쪽 최상단 고정 로그아웃 버튼 -->
+        <div class="logout-top-right">
+            <button class="btn btn-danger" onclick="handleLogout()">로그아웃</button>
+        </div>
+
         <div class="header-right" style="font-size: 0.85rem; align-items: center;">
             <!-- 접속 가계부 전환 드롭다운 스위치 -->
             <select id="mainModeDropdown" class="mode-select-dropdown" onchange="onMainModeDropdownChange(this.value)">
@@ -200,7 +210,6 @@
             <button class="btn btn-green" id="manualSaveBtn">서버 저장</button>
             <button class="btn btn-sub" onclick="exportToCSV()">엑셀 내보내기</button>
             <button class="btn btn-warn" onclick="openPasswordModal()">암호변경</button>
-            <button class="btn btn-danger" onclick="handleLogout()">로그아웃</button>
         </div>
     </header>
 
