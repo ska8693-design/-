@@ -374,7 +374,7 @@
     </div>
 </div>
 
-<!-- 내역 항목(대분류) 관리 모달 -->
+<!-- 대분류 관리 모달 -->
 <div class="modal-overlay" id="sectionManagerModal">
     <div class="modal-box" style="max-width: 600px;">
         <div class="modal-header">
@@ -419,7 +419,7 @@
     </div>
 </div>
 
-<!-- 맞춤형 엑셀 업로드 모달 -->
+<!-- 엑셀 업로드 모달 -->
 <div class="modal-overlay" id="aiModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -537,7 +537,6 @@
     let verifiedEmail = '';
     let sectionSortModes = {};
 
-    /* 오늘 날짜를 YYYY-MM-DD 포맷으로 반환하는 함수 */
     function getTodayString() {
         const today = new Date();
         const yyyy = today.getFullYear();
@@ -769,6 +768,7 @@
     window.switchToMyPersonalBudget = function() {
         const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         currentTargetDocId = myPersonalDocId;
+        saveUserLinkedDocId(myPersonalDocId);
         closeFamilyModal();
         fetchCloudData();
         alert('내 개인 가계부로 전환되었습니다.');
@@ -776,13 +776,12 @@
 
     window.switchToLinkedBudget = function() {
         const uid = auth.currentUser.uid;
-        const linkedDocId = localStorage.getItem(`linked_family_${uid}`);
-        if (linkedDocId) {
-            currentTargetDocId = linkedDocId;
-            closeFamilyModal();
-            fetchCloudData();
-            alert('연동된 공유 가계부로 전환되었습니다.');
-        }
+        const linkedDocId = localStorage.getItem(`linked_family_${uid}`) || 'shared_data';
+        currentTargetDocId = linkedDocId;
+        saveUserLinkedDocId(linkedDocId);
+        closeFamilyModal();
+        fetchCloudData();
+        alert('공유 가계부로 전환되었습니다.');
     }
 
     window.unlinkFamilyAccount = function() {
@@ -791,10 +790,23 @@
             localStorage.removeItem(`linked_family_${uid}`);
             const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
             currentTargetDocId = myPersonalDocId;
+            saveUserLinkedDocId(myPersonalDocId);
             closeFamilyModal();
             fetchCloudData();
             alert('연동이 해제되었습니다.');
         }
+    }
+
+    /* Firestore 계정 정보에 연동 문서 ID 동기화 보장 */
+    function saveUserLinkedDocId(docId) {
+        if (!auth.currentUser) return;
+        const uid = auth.currentUser.uid;
+        localStorage.setItem(`linked_family_${uid}`, docId);
+        db.collection("users").doc(uid).set({
+            linkedDocId: docId,
+            email: currentUserEmail,
+            updatedAt: Date.now()
+        }, { merge: true });
     }
 
     window.sendFamilyInvitation = function() {
@@ -815,7 +827,7 @@
             type: 'invite_to_my_budget',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: `user_${safeMyEmail}`,
+            targetDocId: 'shared_data',
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -844,7 +856,7 @@
             type: 'request_to_join',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: `user_${targetEmail.replace(/[^a-z0-9]/g, '_')}`,
+            targetDocId: 'shared_data',
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -922,8 +934,8 @@
 
     window.respondInvitation = function(inviteId, targetDocId, isAccepted) {
         if (isAccepted) {
-            currentTargetDocId = targetDocId;
-            localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
+            currentTargetDocId = targetDocId || 'shared_data';
+            saveUserLinkedDocId(currentTargetDocId);
             
             db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
                 alert('요청을 수락했습니다! 가계부 연동이 완료되었습니다.');
@@ -979,15 +991,20 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainAppContainer').classList.add('active');
             
-            const savedLink = localStorage.getItem(`linked_family_${user.uid}`);
-            if (savedLink) {
-                currentTargetDocId = savedLink;
-            } else {
-                const safeEmailId = currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
-                currentTargetDocId = `user_${safeEmailId}`;
-            }
+            // DB에 저장된 사용자의 연동 가계부 문서 정보 확인
+            db.collection("users").doc(user.uid).get().then(docSnap => {
+                if (docSnap.exists && docSnap.data().linkedDocId) {
+                    currentTargetDocId = docSnap.data().linkedDocId;
+                } else {
+                    const savedLink = localStorage.getItem(`linked_family_${user.uid}`);
+                    currentTargetDocId = savedLink || 'shared_data';
+                }
+                fetchCloudData();
+            }).catch(() => {
+                currentTargetDocId = 'shared_data';
+                fetchCloudData();
+            });
 
-            fetchCloudData();
             startGlobalInviteListener();
         } else {
             document.getElementById('loginScreen').style.display = 'block';
@@ -1000,8 +1017,8 @@
     });
 
     function fetchCloudData() {
-        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-        let displayTarget = currentTargetDocId === myPersonalDocId ? '개인 가계부' : '공유 가계부';
+        if (!currentTargetDocId) currentTargetDocId = 'shared_data';
+        let displayTarget = currentTargetDocId === 'shared_data' ? '공용 가계부' : '개인 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
 
         db.collection("family_budget").doc(currentTargetDocId).onSnapshot(docSnap => {
@@ -1823,7 +1840,6 @@
                 renderSelectOptions(catKey, `catSelect_${sec.id}`);
             } else if (sec.type === 'variable') {
                 renderSelectOptions('variable', `catSelect_${sec.id}`);
-                /* 생활비 날짜 입력창 기본값을 오늘 날짜로 자동 설정 */
                 let varDateElem = document.getElementById(`varDate_${sec.id}`);
                 if (varDateElem) {
                     varDateElem.value = getTodayString();
