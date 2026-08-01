@@ -469,7 +469,7 @@
 
         <!-- 개별 공유 사용자 권한 설정 목록 -->
         <div style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
-            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">🛡️ 공유 사용자별 접근 권한 설정</label>
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">🛡️ 공유 사용자별 접근 권한 설정 및 연동 해제</label>
             <div id="sharedUserPermissionsList" style="max-height: 120px; overflow-y: auto; font-size: 0.85rem; border:1px solid var(--border); border-radius:6px; padding:6px; background:#f8fafc;">
                 <!-- 동적으로 채워집니다 -->
             </div>
@@ -784,7 +784,7 @@
         renderSharedUserPermissionsList();
     }
 
-    /* 개별 공유 사용자 권한 설정 목록 (내가 소유자일 때만 표시하도록 수정) */
+    /* 개별 공유 사용자 권한 설정 목록 (소유자 전용 관리 & 연동 해제 버튼 추가) */
     function renderSharedUserPermissionsList() {
         const permListEl = document.getElementById('sharedUserPermissionsList');
         if (!permListEl) return;
@@ -794,7 +794,7 @@
 
         // 현재 접속한 가계부가 '내 가계부'가 아니라 '남의 공유 가계부'라면 권한 설정 불가 안내
         if (currentTargetDocId !== myPersonalDocId) {
-            permListEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:8px;">🔒 이 가계부의 소유자만 접근 권한을 변경할 수 있습니다.</div>';
+            permListEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:8px;">🔒 이 가계부의 소유자만 접근 권한을 변경하거나 연동을 해제할 수 있습니다.</div>';
             return;
         }
 
@@ -822,9 +822,38 @@
                             <option value="read" ${currentPerm === 'read' ? 'selected' : ''}>👁️ 읽기 전용</option>
                         </select>
                         <button class="btn btn-purple" style="padding:2px 6px; font-size:0.75rem;" onclick="saveIndividualPermission('${email}')">저장</button>
+                        <button class="btn btn-danger" style="padding:2px 6px; font-size:0.75rem;" onclick="removeSharedUserAccess('${email}')">공유해제</button>
                     </div>
                 </div>`;
         });
+    }
+
+    /* 소유자가 특정 사용자의 공유 접근 권한을 삭제(연동 해제)하는 함수 */
+    window.removeSharedUserAccess = function(userEmail) {
+        const myPersonalDocId = getMyPersonalDocId();
+        if (currentTargetDocId !== myPersonalDocId) {
+            alert('본인 소유의 가계부에서만 공유를 해제할 수 있습니다.');
+            return;
+        }
+
+        if (confirm(`정말 [${userEmail}] 님과의 가계부 공유를 해제하시겠습니까?\n해제 시 해당 사용자는 더 이상 내 가계부에 접근할 수 없습니다.`)) {
+            const cleanUserEmail = userEmail.toLowerCase();
+            
+            // 1. 상대방의 shared_access 권한 문서 삭제
+            db.collection("shared_access").doc(`${cleanUserEmail}_${myPersonalDocId}`).delete().then(() => {
+                // 2. 내 가계부의 permissions 객체에서 상대방 이메일 제거
+                if (allCloudData.permissions && allCloudData.permissions[cleanUserEmail]) {
+                    delete allCloudData.permissions[cleanUserEmail];
+                    saveCloudData();
+                }
+                
+                alert(`[${userEmail}] 님과의 가계부 공유가 해제되었습니다.`);
+                renderSharedUserPermissionsList();
+                updateMainModeDropdown();
+            }).catch(err => {
+                alert('공유 해제 중 오류 발생: ' + err.message);
+            });
+        }
     }
 
     /* 개별 권한 저장 함수 (소유자 검증 추가) */
@@ -839,7 +868,7 @@
         const selVal = document.getElementById(`perm_sel_${cleanKey}`).value;
         
         if (!allCloudData.permissions) allCloudData.permissions = {};
-        allCloudData.permissions[userEmail] = selVal;
+        allCloudData.permissions[userEmail.toLowerCase()] = selVal;
         
         saveCloudData();
         alert(`[${userEmail}] 님의 접근 권한이 업데이트되었습니다.`);
@@ -857,15 +886,27 @@
         return true;
     }
 
-    /* 드롭다운 항목 업데이트 */
+    /* 드롭다운 항목 업데이트 (공유중 / 열람중 명확한 표현 추가) */
     function updateMainModeDropdown() {
         const select = document.getElementById('mainModeDropdown');
         if (!select) return;
 
-        let html = `<option value="${getMyPersonalDocId()}">🔒 내 개인 가계부 (${currentUserEmail})</option>`;
+        const myPersonalDocId = getMyPersonalDocId();
+        
+        // 내 가계부가 다른 사람에게 공유중인지 체크
+        let isMyBudgetSharedWithOthers = false;
+        if (allCloudData.permissions) {
+            const otherUsers = Object.keys(allCloudData.permissions).filter(
+                email => email.toLowerCase() !== currentUserEmail.toLowerCase()
+            );
+            if (otherUsers.length > 0) isMyBudgetSharedWithOthers = true;
+        }
+
+        const myLabelSuffix = isMyBudgetSharedWithOthers ? ' (공유중)' : '';
+        let html = `<option value="${myPersonalDocId}">🔒 내 개인 가계부 (${currentUserEmail})${myLabelSuffix}</option>`;
         
         sharedBudgetsList.forEach(b => {
-            html += `<option value="${b.docId}">👥 공유: ${b.ownerEmail} 님의 가계부</option>`;
+            html += `<option value="${b.docId}">👥 공유: ${b.ownerEmail} 님의 가계부 (열람중)</option>`;
         });
 
         select.innerHTML = html;
@@ -890,8 +931,7 @@
 
     window.unlinkFamilyAccount = function() {
         if (confirm('정말 연동을 해제하시겠습니까? 해제 후에는 내 개인 가계부로 전환됩니다.')) {
-            const uid = auth.currentUser.uid;
-            db.collection("shared_access").doc(`${uid}_${currentTargetDocId}`).delete();
+            db.collection("shared_access").doc(`${currentUserEmail.toLowerCase()}_${currentTargetDocId}`).delete();
             
             const myPersonalDocId = getMyPersonalDocId();
             currentTargetDocId = myPersonalDocId;
@@ -1055,7 +1095,7 @@
 
                 if (invData.type === 'request_to_join') {
                     // 상대방 연동 요청 수락 ➔ 요청한 사람(sender)에게 내 가계부(myPersonalDocId) 권한 부여
-                    db.collection("shared_access").doc(`${invData.senderEmail}_${myPersonalDocId}`).set({
+                    db.collection("shared_access").doc(`${invData.senderEmail.toLowerCase()}_${myPersonalDocId}`).set({
                         userEmail: invData.senderEmail.toLowerCase(),
                         docId: myPersonalDocId,
                         ownerEmail: currentUserEmail.toLowerCase(),
@@ -1070,7 +1110,7 @@
                     alert('연동 요청을 수락했습니다! 상대방 화면에서 내 가계부가 공유됩니다.');
                 } else {
                     // 초대 수락 ➔ 내 접근 목록(shared_access)에 상대방 가계부 추가
-                    db.collection("shared_access").doc(`${uid}_${targetDocId}`).set({
+                    db.collection("shared_access").doc(`${currentUserEmail.toLowerCase()}_${targetDocId}`).set({
                         userUid: uid,
                         userEmail: currentUserEmail.toLowerCase(),
                         docId: targetDocId,
@@ -1218,6 +1258,7 @@
                 allCloudData = {};
             }
             render();
+            updateMainModeDropdown();
             if (document.getElementById('familyModal').classList.contains('active')) {
                 renderSharedUserPermissionsList();
             }
