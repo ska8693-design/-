@@ -784,14 +784,23 @@
         renderSharedUserPermissionsList();
     }
 
-    /* 사용자별 개별 권한 변경 및 렌더링 (본인 이메일은 목록에서 제외) */
+    /* 개별 공유 사용자 권한 설정 목록 (내가 소유자일 때만 표시하도록 수정) */
     function renderSharedUserPermissionsList() {
         const permListEl = document.getElementById('sharedUserPermissionsList');
         if (!permListEl) return;
         permListEl.innerHTML = '';
 
+        const myPersonalDocId = getMyPersonalDocId();
+
+        // 현재 접속한 가계부가 '내 가계부'가 아니라 '남의 공유 가계부'라면 권한 설정 불가 안내
+        if (currentTargetDocId !== myPersonalDocId) {
+            permListEl.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:8px;">🔒 이 가계부의 소유자만 접근 권한을 변경할 수 있습니다.</div>';
+            return;
+        }
+
         if (!allCloudData.permissions) allCloudData.permissions = {};
 
+        // 본인 계정을 제외한 공유 상대방 계정만 추출
         const userEmails = Object.keys(allCloudData.permissions).filter(
             email => email.toLowerCase() !== currentUserEmail.toLowerCase()
         );
@@ -818,12 +827,20 @@
         });
     }
 
+    /* 개별 권한 저장 함수 (소유자 검증 추가) */
     window.saveIndividualPermission = function(userEmail) {
-        if (!checkUserPermission()) return;
+        const myPersonalDocId = getMyPersonalDocId();
+        if (currentTargetDocId !== myPersonalDocId) {
+            alert('본인 소유의 가계부 권한만 변경할 수 있습니다.');
+            return;
+        }
+
         const cleanKey = userEmail.replace(/[^a-z0-9]/g, '_');
         const selVal = document.getElementById(`perm_sel_${cleanKey}`).value;
+        
         if (!allCloudData.permissions) allCloudData.permissions = {};
         allCloudData.permissions[userEmail] = selVal;
+        
         saveCloudData();
         alert(`[${userEmail}] 님의 접근 권한이 업데이트되었습니다.`);
     }
