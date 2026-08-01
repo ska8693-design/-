@@ -47,6 +47,10 @@
         .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .month-selector input { padding: 8px 14px; border-radius: 6px; border: none; font-size: 1rem; font-weight: bold; cursor: pointer; }
 
+        /* 메인 헤더 드롭다운 커스텀 스타일 */
+        .mode-select-dropdown { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.2); color: white; font-weight: bold; font-size: 0.85rem; cursor: pointer; height: 38px; }
+        .mode-select-dropdown option { background: var(--primary); color: white; }
+
         /* 헤더 우측 버튼 패딩 및 규격 일괄 통일 */
         .header-right .btn { padding: 8px 12px !important; font-size: 0.85rem !important; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
 
@@ -182,7 +186,12 @@
             <button class="btn btn-sub" style="padding: 2px 6px; font-size: 0.75rem; background: rgba(255,255,255,0.2);" onclick="editFamilyTitle()">⚙️ 가계부 이름 변경</button>
         </h1>
         <div class="header-right" style="font-size: 0.85rem; align-items: center;">
-            <span id="currentConnectedInfo" style="background: rgba(255,255,255,0.15); padding: 4px 8px; border-radius: 4px; font-weight: 500;">연동 중...</span>
+            <!-- 접속 가계부 전환 드롭다운 스위치 -->
+            <select id="mainModeDropdown" class="mode-select-dropdown" onchange="onMainModeDropdownChange(this.value)">
+                <option value="shared_data">👥 연동된 공유 가계부</option>
+                <option value="personal">🔒 내 개인 가계부</option>
+            </select>
+            <span id="currentConnectedInfo" style="display:none;"></span>
             <span id="autoSaveStatus" style="font-size: 0.75rem; color: #cbd5e1;">(자동저장 대기중)</span>
             <div class="month-selector">
                 <input type="month" id="currentMonth" onchange="loadMonthData()">
@@ -374,7 +383,7 @@
     </div>
 </div>
 
-<!-- 내역 항목(대분류) 관리 모달 -->
+<!-- 대분류 관리 모달 -->
 <div class="modal-overlay" id="sectionManagerModal">
     <div class="modal-box" style="max-width: 600px;">
         <div class="modal-header">
@@ -419,7 +428,7 @@
     </div>
 </div>
 
-<!-- 맞춤형 엑셀 업로드 모달 -->
+<!-- 엑셀 업로드 모달 -->
 <div class="modal-overlay" id="aiModal">
     <div class="modal-box">
         <div class="modal-header">
@@ -446,17 +455,29 @@
 <div class="modal-overlay" id="familyModal">
     <div class="modal-box">
         <div class="modal-header">
-            <span>👥 가족 가계부 연동 및 관리</span>
+            <span>👥 가족 가계부 연동 및 권한 관리</span>
             <span style="cursor:pointer; font-size:1.2rem;" onclick="closeFamilyModal()">&times;</span>
         </div>
         
         <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px; margin-bottom:15px;">
             <div style="font-size:0.85rem; font-weight:bold; color:#1e40af; margin-bottom:6px;">현재 접속 중인 가계부 모드</div>
-            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">개인 고유 가계부 접속 중</div>
+            <div id="currentModeStatusText" style="font-size:0.9rem; margin-bottom:10px; color:#1e3a8a;">공용 가계부 접속 중</div>
             <div style="display:flex; gap:8px;">
                 <button class="btn" style="flex:1; background:#475569; padding:6px;" onclick="switchToMyPersonalBudget()">내 개인 가계부 보기</button>
-                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px; display:none;" onclick="switchToLinkedBudget()">연동된 공유 가계부 보기</button>
+                <button class="btn" id="switchToLinkedBtn" style="flex:1; background:#2563eb; padding:6px;" onclick="switchToLinkedBudget()">연동된 공유 가계부 보기</button>
                 <button class="btn btn-danger" id="unlinkBtn" style="padding:6px; display:none;" onclick="unlinkFamilyAccount()">연동 해제</button>
+            </div>
+        </div>
+
+        <!-- 공유 상대방 권한 설정 섹션 -->
+        <div style="margin-bottom: 15px; border-bottom: 1px solid var(--border); padding-bottom: 12px;">
+            <label style="font-size:0.85rem; font-weight:bold; display:block; margin-bottom:5px;">🛡️ 공유 상대방 접근 권한 설정</label>
+            <div style="display:flex; gap:6px; align-items:center;">
+                <select id="familyPermissionSelect" style="flex:1; padding:8px; border:1px solid var(--border); border-radius:6px; font-size:0.85rem;">
+                    <option value="write">✏️ 수정 가능 권한 (추가/수정/삭제 허용)</option>
+                    <option value="read">👁️ 읽기 전용 (조회만 가능)</option>
+                </select>
+                <button class="btn btn-purple" onclick="saveFamilyPermission()">권한 저장</button>
             </div>
         </div>
 
@@ -525,7 +546,7 @@
     const db = firebase.firestore();
 
     let allCloudData = {};
-    let currentTargetDocId = '';
+    let currentTargetDocId = 'shared_data'; // 기본 공유 저장소 고정
     let currentUserEmail = '';
     let isDataDirty = false;
     let inviteUnsubscribe = null;
@@ -537,7 +558,6 @@
     let verifiedEmail = '';
     let sectionSortModes = {};
 
-    /* 오늘 날짜를 YYYY-MM-DD 포맷으로 반환하는 함수 */
     function getTodayString() {
         const today = new Date();
         const yyyy = today.getFullYear();
@@ -560,6 +580,7 @@
         setupDragAndDrop();
 
         document.getElementById('manualSaveBtn').addEventListener('click', function() {
+            if (!checkUserPermission()) return;
             db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
                 isDataDirty = false;
                 document.getElementById('autoSaveStatus').innerText = '(서버 저장 완료)';
@@ -761,28 +782,63 @@
             unlinkBtn.style.display = 'block';
         } else {
             statusText.innerText = '현재 내 개인 고유 가계부 보는 중';
-            switchLinkedBtn.style.display = linkedDocId && linkedDocId !== myPersonalDocId ? 'block' : 'none';
+            switchLinkedBtn.style.display = 'block';
             unlinkBtn.style.display = 'none';
         }
+
+        // 권한 설정 셀렉트 박스 불러오기
+        const curPerm = (allCloudData.permissions && allCloudData.permissions.sharedUser) ? allCloudData.permissions.sharedUser : 'write';
+        document.getElementById('familyPermissionSelect').value = curPerm;
+    }
+
+    /* 권한 변경 저장 */
+    window.saveFamilyPermission = function() {
+        const perm = document.getElementById('familyPermissionSelect').value;
+        if (!allCloudData.permissions) allCloudData.permissions = {};
+        allCloudData.permissions.sharedUser = perm;
+        saveCloudData();
+        alert('상대방 접근 권한 설정이 저장되었습니다.');
+    }
+
+    /* 읽기 전용 권한 검증 체크 */
+    function checkUserPermission() {
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        if (currentTargetDocId !== myPersonalDocId) {
+            if (allCloudData.permissions && allCloudData.permissions.sharedUser === 'read') {
+                alert('현재 공유 가계부에 [읽기 전용] 권한으로 설정되어 있어 데이터를 변경할 수 없습니다.');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /* 헤더 메인 드롭다운 변경 이벤트 */
+    window.onMainModeDropdownChange = function(val) {
+        const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        if (val === 'personal') {
+            currentTargetDocId = myPersonalDocId;
+        } else {
+            currentTargetDocId = 'shared_data';
+        }
+        saveUserLinkedDocId(currentTargetDocId);
+        fetchCloudData();
     }
 
     window.switchToMyPersonalBudget = function() {
         const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         currentTargetDocId = myPersonalDocId;
+        saveUserLinkedDocId(myPersonalDocId);
         closeFamilyModal();
         fetchCloudData();
         alert('내 개인 가계부로 전환되었습니다.');
     }
 
     window.switchToLinkedBudget = function() {
-        const uid = auth.currentUser.uid;
-        const linkedDocId = localStorage.getItem(`linked_family_${uid}`);
-        if (linkedDocId) {
-            currentTargetDocId = linkedDocId;
-            closeFamilyModal();
-            fetchCloudData();
-            alert('연동된 공유 가계부로 전환되었습니다.');
-        }
+        currentTargetDocId = 'shared_data';
+        saveUserLinkedDocId(currentTargetDocId);
+        closeFamilyModal();
+        fetchCloudData();
+        alert('공유 가계부로 전환되었습니다.');
     }
 
     window.unlinkFamilyAccount = function() {
@@ -791,9 +847,27 @@
             localStorage.removeItem(`linked_family_${uid}`);
             const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
             currentTargetDocId = myPersonalDocId;
+            saveUserLinkedDocId(myPersonalDocId);
             closeFamilyModal();
             fetchCloudData();
             alert('연동이 해제되었습니다.');
+        }
+    }
+
+    function saveUserLinkedDocId(docId) {
+        if (!auth.currentUser) return;
+        const uid = auth.currentUser.uid;
+        localStorage.setItem(`linked_family_${uid}`, docId);
+        db.collection("users").doc(uid).set({
+            linkedDocId: docId,
+            email: currentUserEmail,
+            updatedAt: Date.now()
+        }, { merge: true });
+
+        const mainDropdown = document.getElementById('mainModeDropdown');
+        if (mainDropdown) {
+            const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+            mainDropdown.value = (docId === myPersonalDocId) ? 'personal' : 'shared_data';
         }
     }
 
@@ -815,7 +889,7 @@
             type: 'invite_to_my_budget',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: `user_${safeMyEmail}`,
+            targetDocId: 'shared_data',
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -844,7 +918,7 @@
             type: 'request_to_join',
             senderEmail: currentUserEmail,
             receiverEmail: targetEmail,
-            targetDocId: `user_${targetEmail.replace(/[^a-z0-9]/g, '_')}`,
+            targetDocId: 'shared_data',
             status: 'pending',
             createdAt: Date.now()
         }).then(() => {
@@ -922,8 +996,8 @@
 
     window.respondInvitation = function(inviteId, targetDocId, isAccepted) {
         if (isAccepted) {
-            currentTargetDocId = targetDocId;
-            localStorage.setItem(`linked_family_${auth.currentUser.uid}`, currentTargetDocId);
+            currentTargetDocId = targetDocId || 'shared_data';
+            saveUserLinkedDocId(currentTargetDocId);
             
             db.collection("family_invites").doc(inviteId).update({ status: 'accepted' }).then(() => {
                 alert('요청을 수락했습니다! 가계부 연동이 완료되었습니다.');
@@ -979,15 +1053,26 @@
             document.getElementById('loginScreen').style.display = 'none';
             document.getElementById('mainAppContainer').classList.add('active');
             
-            const savedLink = localStorage.getItem(`linked_family_${user.uid}`);
-            if (savedLink) {
-                currentTargetDocId = savedLink;
-            } else {
-                const safeEmailId = currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_');
-                currentTargetDocId = `user_${safeEmailId}`;
-            }
+            db.collection("users").doc(user.uid).get().then(docSnap => {
+                if (docSnap.exists && docSnap.data().linkedDocId) {
+                    currentTargetDocId = docSnap.data().linkedDocId;
+                } else {
+                    const savedLink = localStorage.getItem(`linked_family_${user.uid}`);
+                    currentTargetDocId = savedLink || 'shared_data';
+                }
+                
+                const mainDropdown = document.getElementById('mainModeDropdown');
+                if (mainDropdown) {
+                    const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                    mainDropdown.value = (currentTargetDocId === myPersonalDocId) ? 'personal' : 'shared_data';
+                }
 
-            fetchCloudData();
+                fetchCloudData();
+            }).catch(() => {
+                currentTargetDocId = 'shared_data';
+                fetchCloudData();
+            });
+
             startGlobalInviteListener();
         } else {
             document.getElementById('loginScreen').style.display = 'block';
@@ -1000,6 +1085,7 @@
     });
 
     function fetchCloudData() {
+        if (!currentTargetDocId) currentTargetDocId = 'shared_data';
         const myPersonalDocId = `user_${currentUserEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
         let displayTarget = currentTargetDocId === myPersonalDocId ? '개인 가계부' : '공유 가계부';
         document.getElementById('currentConnectedInfo').innerText = `🔗 ${currentUserEmail} (${displayTarget})`;
@@ -1024,6 +1110,7 @@
     }
 
     window.editFamilyTitle = function() {
+        if (!checkUserPermission()) return;
         const currentTitle = allCloudData.familyTitle || '우리집';
         const newTitle = prompt('가계부 이름을 입력하세요 (예: 김씨네, 우리집 등):', currentTitle);
         if (newTitle !== null && newTitle.trim() !== '') {
@@ -1033,6 +1120,7 @@
     }
 
     window.clearCurrentMonthData = function() {
+        if (!checkUserPermission()) return;
         const curKey = getMonthKey();
         if (confirm(`정말 [${curKey}] 월의 모든 입력 내역을 초기화하시겠습니까?`)) {
             allCloudData[curKey] = {
@@ -1050,6 +1138,7 @@
     }
 
     window.clearAllCloudData = function() {
+        if (!checkUserPermission()) return;
         if (confirm('경고: 전체 모든 월의 가계부 데이터와 설정이 영구적으로 삭제됩니다. 진행하시겠습니까?')) {
             allCloudData = {};
             saveCloudData();
@@ -1058,6 +1147,7 @@
     }
 
     function saveCloudData() {
+        if (!checkUserPermission()) return;
         isDataDirty = true;
         document.getElementById('autoSaveStatus').innerText = '(변경사항 있음)';
         db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
@@ -1069,6 +1159,7 @@
     }
 
     function saveCloudDataSilently() {
+        if (!checkUserPermission()) return;
         db.collection("family_budget").doc(currentTargetDocId).set(allCloudData).then(() => {
             isDataDirty = false;
             document.getElementById('autoSaveStatus').innerText = '(자동저장 완료)';
@@ -1184,6 +1275,7 @@
     }
 
     window.addNewSectionDef = function() {
+        if (!checkUserPermission()) return;
         const nameInput = document.getElementById('newSectionTitleInput');
         const typeInput = document.getElementById('newSectionTypeInput');
         const name = nameInput.value.trim();
@@ -1198,6 +1290,7 @@
     }
 
     window.toggleSectionCalc = function(secId) {
+        if (!checkUserPermission()) return;
         const defs = getSectionDefs();
         const sec = defs.find(x => x.id === secId);
         if (sec) {
@@ -1207,6 +1300,7 @@
     }
 
     window.moveSectionOrder = function(idx, direction) {
+        if (!checkUserPermission()) return;
         const defs = getSectionDefs();
         const targetIdx = idx + direction;
         if (targetIdx < 0 || targetIdx >= defs.length) return;
@@ -1218,6 +1312,7 @@
     }
 
     window.editSectionName = function(idx) {
+        if (!checkUserPermission()) return;
         const defs = getSectionDefs();
         const newName = prompt('수정할 대분류 이름을 입력하세요:', defs[idx].name);
         if (newName && newName.trim() !== '') {
@@ -1228,6 +1323,7 @@
     }
 
     window.deleteSectionDef = function(idx) {
+        if (!checkUserPermission()) return;
         const defs = getSectionDefs();
         if (confirm(`'${defs[idx].name}' 대분류를 삭제하시겠습니까?`)) {
             defs.splice(idx, 1);
@@ -1292,6 +1388,7 @@
     }
 
     window.moveCatOrder = function(idx, direction) {
+        if (!checkUserPermission()) return;
         const cats = getCategories(currentEditingTarget);
         const targetIdx = idx + direction;
         if (targetIdx < 0 || targetIdx >= cats.length) return;
@@ -1303,6 +1400,7 @@
     }
 
     window.addModalCategory = function() {
+        if (!checkUserPermission()) return;
         const input = document.getElementById('modalNewCatName');
         const name = input.value.trim();
         if (!name) return alert('항목명을 입력해주세요.');
@@ -1318,6 +1416,7 @@
     }
 
     window.editModalCat = function(idx) {
+        if (!checkUserPermission()) return;
         const cats = getCategories(currentEditingTarget);
         const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
         if (newName && newName.trim() !== '') {
@@ -1328,6 +1427,7 @@
     }
 
     window.deleteModalCat = function(idx) {
+        if (!checkUserPermission()) return;
         const cats = getCategories(currentEditingTarget);
         if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
             cats.splice(idx, 1);
@@ -1337,6 +1437,7 @@
     }
 
     window.addCustomIncome = function(secId) {
+        if (!checkUserPermission()) return;
         const name = document.getElementById(`incName_${secId}`).value;
         const desc = document.getElementById(`incDesc_${secId}`).value;
         const amount = parseAmount(document.getElementById(`incAmount_${secId}`).value);
@@ -1348,6 +1449,7 @@
     }
 
     window.addCustomExpense = function(secId, catKey) {
+        if (!checkUserPermission()) return;
         const cat = document.getElementById(`catSelect_${secId}`).value;
         const desc = document.getElementById(`desc_${secId}`).value;
         const amount = parseAmount(document.getElementById(`amount_${secId}`).value);
@@ -1360,6 +1462,7 @@
 
     /* 생활비 입력란 (오늘 날짜 자동 연동) */
     window.addCustomVariable = function(secId, catKey) {
+        if (!checkUserPermission()) return;
         const dateInput = document.getElementById(`varDate_${secId}`);
         const date = (dateInput && dateInput.value) ? dateInput.value : getTodayString();
         const cat = document.getElementById(`catSelect_${secId}`).value;
@@ -1373,6 +1476,7 @@
     }
 
     window.addCustomAsset = function(secId) {
+        if (!checkUserPermission()) return;
         const type = document.getElementById(`assetType_${secId}`).value;
         const name = document.getElementById(`assetName_${secId}`).value;
         const val = parseAmount(document.getElementById(`assetVal_${secId}`).value);
@@ -1384,6 +1488,7 @@
     }
 
     window.updateItemNoteSilent = function(listKey, id, val) {
+        if (!checkUserPermission()) return;
         const data = getStoredData(getMonthKey());
         const item = data[listKey].find(x => x.id === id);
         if (item) {
@@ -1395,6 +1500,7 @@
 
     /* 행 단위 통합 수정 모달 로직 */
     window.openRowEditModal = function(secId, itemId) {
+        if (!checkUserPermission()) return;
         const data = getStoredData(getMonthKey());
         const item = (data[secId] || []).find(x => x.id === itemId);
         if (!item) return;
@@ -1460,6 +1566,7 @@
     }
 
     window.saveRowEdit = function() {
+        if (!checkUserPermission()) return;
         const secId = document.getElementById('editRowSecId').value;
         const itemId = Number(document.getElementById('editRowItemId').value);
 
@@ -1505,6 +1612,7 @@
     }
 
     window.toggleManualCarry = function() {
+        if (!checkUserPermission()) return;
         const data = getStoredData(getMonthKey());
         data.isManualCarry = document.getElementById('isManualCarry').checked;
         if (data.isManualCarry) data.manualCarryVal = calculateNetWorthFor(getMonthKey());
@@ -1512,12 +1620,14 @@
     }
 
     window.saveManualCarry = function() {
+        if (!checkUserPermission()) return;
         const data = getStoredData(getMonthKey());
         data.manualCarryVal = parseAmount(document.getElementById('carryOverInput').value);
         saveData(data);
     }
 
     window.deleteItem = function(listKey, id) {
+        if (!checkUserPermission()) return;
         const data = getStoredData(getMonthKey());
         data[listKey] = data[listKey].filter(item => item.id !== id);
         saveData(data);
@@ -1576,6 +1686,7 @@
     }
 
     function saveData(data) {
+        if (!checkUserPermission()) return;
         allCloudData[getMonthKey()] = data;
         saveCloudData();
         render();
@@ -1925,6 +2036,7 @@
     }
 
     window.moveCatOrder = function(idx, direction) {
+        if (!checkUserPermission()) return;
         const cats = getCategories(currentEditingTarget);
         const targetIdx = idx + direction;
         if (targetIdx < 0 || targetIdx >= cats.length) return;
@@ -1936,6 +2048,7 @@
     }
 
     window.addModalCategory = function() {
+        if (!checkUserPermission()) return;
         const input = document.getElementById('modalNewCatName');
         const name = input.value.trim();
         if (!name) return alert('항목명을 입력해주세요.');
@@ -1951,6 +2064,7 @@
     }
 
     window.editModalCat = function(idx) {
+        if (!checkUserPermission()) return;
         const cats = getCategories(currentEditingTarget);
         const newName = prompt('수정할 항목명을 입력하세요:', cats[idx]);
         if (newName && newName.trim() !== '') {
@@ -1961,6 +2075,7 @@
     }
 
     window.deleteModalCat = function(idx) {
+        if (!checkUserPermission()) return;
         const cats = getCategories(currentEditingTarget);
         if (confirm(`'${cats[idx]}' 항목을 삭제하시겠습니까?`)) {
             cats.splice(idx, 1);
@@ -2000,6 +2115,7 @@
     }
 
     function processExcelFile(file) {
+        if (!checkUserPermission()) return;
         document.getElementById('selectedFileName').innerText = `선택된 파일: ${file.name}`;
         const reader = new FileReader();
 
@@ -2125,6 +2241,7 @@
     }
 
     window.processAiSmartInput = function() {
+        if (!checkUserPermission()) return;
         const text = document.getElementById('aiSmartText').value.trim();
         if (!text) return alert('입력 내용을 적어주세요.');
 
@@ -2166,6 +2283,7 @@
     }
 
     window.importSectionData = function(sectionKey) {
+        if (!checkUserPermission()) return;
         const curKey = getMonthKey();
         const [y, m] = curKey.split('-').map(Number);
         const prevDate = new Date(y, m - 2, 1);
